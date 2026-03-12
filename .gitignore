@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Docker
+postgres_data/
+
+# Prisma
+prisma/*.db
+
+# Testing
+coverage/
+
+# Vite
+*.local
+
+# TypeScript
+*.tsbuildinfo
