@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
-import api from "@/lib/axios";
+import { useOrderDetail, useUpdateOrderStatus, queryKeys } from "@/lib/queries";
+import { useQueryClient } from "@tanstack/react-query";
 import { createSocket } from "@/lib/socket";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,25 +17,6 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Socket } from "socket.io-client";
-
-interface OrderItem {
-  id: number;
-  quantity: number;
-  priceAtOrder: number;
-  product: { name: string };
-}
-
-interface Order {
-  id: number;
-  totalAmount: number;
-  status: string;
-  deliveryAddress: string;
-  deliveryLatitude?: number | null;
-  deliveryLongitude?: number | null;
-  createdAt: string;
-  user?: { email: string };
-  orderItems: OrderItem[];
-}
 
 interface ChatMessage {
   orderId: number;
@@ -53,34 +35,15 @@ const statusColors: Record<string, string> = {
 
 export function AdminOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [order, setOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: order, isLoading } = useOrderDetail(id);
+  const updateStatus = useUpdateOrderStatus();
+
   const [chatOpen, setChatOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messageInput, setMessageInput] = useState("");
   const socketRef = useRef<Socket | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const fetchOrder = async () => {
-      try {
-        const { data } = await api.get(`/orders/${id}`);
-        setOrder({
-          ...data,
-          totalAmount: Number(data.totalAmount),
-          orderItems: data.orderItems.map((item: any) => ({
-            ...item,
-            priceAtOrder: Number(item.priceAtOrder),
-          })),
-        });
-      } catch {
-        toast.error("Failed to load order");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchOrder();
-  }, [id]);
 
   useEffect(() => {
     const socket = createSocket();
@@ -106,7 +69,9 @@ export function AdminOrderDetailPage() {
     socket.on(
       "orderStatusUpdate",
       (data: { orderId: number; status: string }) => {
-        setOrder((prev) => (prev ? { ...prev, status: data.status } : prev));
+        queryClient.setQueryData(queryKeys.order(id), (old: any) =>
+          old ? { ...old, status: data.status } : old
+        );
       },
     );
 
@@ -119,18 +84,21 @@ export function AdminOrderDetailPage() {
     return () => {
       socket.disconnect();
     };
-  }, [id]);
+  }, [id, queryClient]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const handleStatusChange = async (newStatus: string) => {
-    setOrder((prev) => (prev ? { ...prev, status: newStatus } : prev));
+    queryClient.setQueryData(queryKeys.order(id), (old: any) =>
+      old ? { ...old, status: newStatus } : old
+    );
     try {
-      await api.patch(`/orders/${id}/status`, { status: newStatus });
+      await updateStatus.mutateAsync({ id: Number(id), status: newStatus });
       toast.success(`Status updated to ${newStatus}`);
     } catch {
+      queryClient.invalidateQueries({ queryKey: queryKeys.order(id) });
       toast.error("Failed to update status");
     }
   };
@@ -154,7 +122,7 @@ export function AdminOrderDetailPage() {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="animate-pulse space-y-4 py-8">
         <div className="h-8 w-48 rounded bg-gray-200" />

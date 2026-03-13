@@ -1,28 +1,15 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import api from "@/lib/axios";
+import { useOrderDetail } from "@/lib/queries";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/queries";
 import { createSocket } from "@/lib/socket";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Socket } from "socket.io-client";
-
-interface OrderItem {
-  id: number;
-  quantity: number;
-  priceAtOrder: number;
-  product: { name: string };
-}
-
-interface Order {
-  id: number;
-  totalAmount: number;
-  status: string;
-  deliveryAddress: string;
-  createdAt: string;
-  orderItems: OrderItem[];
-}
+import api from "@/lib/axios";
 
 interface ChatMessage {
   orderId: number;
@@ -42,9 +29,10 @@ export function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const confirmed = searchParams.get("confirmed") === "true";
+  const queryClient = useQueryClient();
 
-  const [order, setOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: order, isLoading } = useOrderDetail(id);
+
   const [chatOpen, setChatOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messageInput, setMessageInput] = useState("");
@@ -52,80 +40,60 @@ export function OrderDetailPage() {
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Fetch order
-  useEffect(() => {
-    const fetchOrder = async () => {
-      try {
-        const { data } = await api.get(`/orders/${id}`);
-        setOrder({
-          ...data,
-          totalAmount: Number(data.totalAmount),
-          orderItems: data.orderItems.map((item: any) => ({
-            ...item,
-            priceAtOrder: Number(item.priceAtOrder),
-          })),
-        });
-      } catch {
-        toast.error("Failed to load order");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchOrder();
-  }, [id]);
-
   // WebSocket connection + polling fallback
   useEffect(() => {
-  const socket = createSocket();
-  socketRef.current = socket;
+    const socket = createSocket();
+    socketRef.current = socket;
 
-  socket.on('chatHistory', (history: ChatMessage[]) => {
-    setMessages(history);
-  });
-
-  socket.on('chatMessage', (msg: ChatMessage) => {
-    setMessages((prev) => {
-      if (prev.some((m) => m.timestamp === msg.timestamp && m.message === msg.message)) {
-        return prev;
-      }
-      return [...prev, msg];
+    socket.on('chatHistory', (history: ChatMessage[]) => {
+      setMessages(history);
     });
-  });
 
-  socket.on('orderStatusUpdate', (data: { orderId: number; status: string }) => {
-    setOrder((prev) => (prev ? { ...prev, status: data.status } : prev));
-    toast.info(`Order status updated to ${data.status}`);
-  });
+    socket.on('chatMessage', (msg: ChatMessage) => {
+      setMessages((prev) => {
+        if (prev.some((m) => m.timestamp === msg.timestamp && m.message === msg.message)) {
+          return prev;
+        }
+        return [...prev, msg];
+      });
+    });
 
-  socket.on('connect', () => {
-    socket.emit('joinOrderRoom', { orderId: Number(id) });
-  });
+    socket.on('orderStatusUpdate', (data: { orderId: number; status: string }) => {
+      queryClient.setQueryData(queryKeys.order(id), (old: any) =>
+        old ? { ...old, status: data.status } : old
+      );
+      toast.info(`Order status updated to ${data.status}`);
+    });
 
-  socket.connect();
+    socket.on('connect', () => {
+      socket.emit('joinOrderRoom', { orderId: Number(id) });
+    });
 
-  const fallbackTimeout = setTimeout(() => {
-    if (!socket.connected) {
-      pollingRef.current = setInterval(async () => {
-        try {
-          const { data } = await api.get(`/orders/${id}`);
-          setOrder((prev) => {
-            if (prev && prev.status !== data.status) {
-              toast.info(`Order status updated to ${data.status}`);
-              return { ...prev, status: data.status };
-            }
-            return prev;
-          });
-        } catch {}
-      }, 10000);
-    }
-  }, 3000);
+    socket.connect();
 
-  return () => {
-    clearTimeout(fallbackTimeout);
-    if (pollingRef.current) clearInterval(pollingRef.current);
-    socket.disconnect();
-  };
-}, [id]);
+    const fallbackTimeout = setTimeout(() => {
+      if (!socket.connected) {
+        pollingRef.current = setInterval(async () => {
+          try {
+            const { data } = await api.get(`/orders/${id}`);
+            queryClient.setQueryData(queryKeys.order(id), (old: any) => {
+              if (old && old.status !== data.status) {
+                toast.info(`Order status updated to ${data.status}`);
+                return { ...old, status: data.status };
+              }
+              return old;
+            });
+          } catch {}
+        }, 10000);
+      }
+    }, 3000);
+
+    return () => {
+      clearTimeout(fallbackTimeout);
+      if (pollingRef.current) clearInterval(pollingRef.current);
+      socket.disconnect();
+    };
+  }, [id, queryClient]);
 
   // Scroll chat to bottom
   useEffect(() => {
@@ -133,16 +101,16 @@ export function OrderDetailPage() {
   }, [messages]);
 
   const sendMessage = () => {
-  if (!messageInput.trim() || !socketRef.current) return;
+    if (!messageInput.trim() || !socketRef.current) return;
 
-  socketRef.current.emit('sendChatMessage', {
-    orderId: Number(id),
-    message: messageInput.trim(),
-    senderRole: 'user',
-  });
+    socketRef.current.emit('sendChatMessage', {
+      orderId: Number(id),
+      message: messageInput.trim(),
+      senderRole: 'user',
+    });
 
-  setMessageInput('');
-};
+    setMessageInput('');
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -151,7 +119,7 @@ export function OrderDetailPage() {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="animate-pulse space-y-4 py-8">
         <div className="h-8 w-48 rounded bg-gray-200" />

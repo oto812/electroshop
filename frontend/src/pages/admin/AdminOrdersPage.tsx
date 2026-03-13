@@ -1,6 +1,8 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import api from '@/lib/axios';
+import { useAdminOrders, useUpdateOrderStatus } from '@/lib/queries';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queries';
 import { createSocket } from '@/lib/socket';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,16 +16,7 @@ import {
 import { OrderMap } from '@/components/admin/OrderMap';
 import { toast } from 'sonner';
 import { Socket } from 'socket.io-client';
-
-interface Order {
-  id: number;
-  totalAmount: number;
-  status: string;
-  createdAt: string;
-  deliveryLatitude?: number | null;
-  deliveryLongitude?: number | null;
-  user: { email: string };
-}
+import { useState } from 'react';
 
 const statuses = ['Pending', 'Processing', 'OutForDelivery', 'Delivered'];
 
@@ -35,24 +28,11 @@ const statusColors: Record<string, string> = {
 };
 
 export function AdminOrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: orders = [], isLoading } = useAdminOrders();
+  const updateStatus = useUpdateOrderStatus();
   const [mapVisible, setMapVisible] = useState(true);
   const socketRef = useRef<Socket | null>(null);
-
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        const { data } = await api.get('/orders/all');
-        setOrders(data);
-      } catch {
-        toast.error('Failed to load orders');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchOrders();
-  }, []);
 
   useEffect(() => {
     const socket = createSocket();
@@ -64,39 +44,34 @@ export function AdminOrdersPage() {
       socket.emit('joinAdminDashboard');
     });
 
-    socket.on('newOrder', (order: Order) => {
-      setOrders((prev) => [order, ...prev]);
+    socket.on('newOrder', (order: any) => {
+      queryClient.setQueryData(queryKeys.adminOrders, (old: any[] | undefined) =>
+        old ? [order, ...old] : [order]
+      );
       toast.info(`New order #${order.id} received!`);
     });
 
     return () => {
       socket.disconnect();
     };
-  }, []);
+  }, [queryClient]);
 
   const handleStatusChange = async (orderId: number, newStatus: string) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
+    // Optimistic update
+    queryClient.setQueryData(queryKeys.adminOrders, (old: any[] | undefined) =>
+      old ? old.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)) : old
     );
 
     try {
-      await api.patch(`/orders/${orderId}/status`, { status: newStatus });
+      await updateStatus.mutateAsync({ id: orderId, status: newStatus });
       toast.success(`Order #${orderId} status updated to ${newStatus}`);
     } catch {
-      const { data } = await api.get('/orders/all');
-      setOrders(data);
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminOrders });
       toast.error('Failed to update status');
     }
   };
-  console.log(
-  orders.map((o) => ({
-    id: o.id,
-    lat: o.deliveryLatitude,
-    lng: o.deliveryLongitude,
-  }))
-);
 
-  if (loading) {
+  if (isLoading) {
     return <div className="animate-pulse space-y-4">
       <div className="h-8 w-48 rounded bg-gray-200" />
       <div className="h-64 rounded bg-gray-200" />

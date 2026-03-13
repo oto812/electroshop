@@ -1,15 +1,6 @@
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import api from '@/lib/axios';
+import { useOrders } from '@/lib/queries';
 import { Card, CardContent } from '@/components/ui/card';
-import { toast } from 'sonner';
-
-interface Order {
-  id: number;
-  totalAmount: number;
-  status: string;
-  createdAt: string;
-}
 
 const statusColors: Record<string, string> = {
   Pending: 'bg-yellow-100 text-yellow-800',
@@ -19,24 +10,9 @@ const statusColors: Record<string, string> = {
 };
 
 export function OrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: orders = [], isLoading } = useOrders();
 
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        const { data } = await api.get('/orders');
-        setOrders(data);
-      } catch {
-        toast.error('Failed to load orders');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchOrders();
-  }, []);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="space-y-4">
         {Array.from({ length: 3 }).map((_, i) => (
@@ -67,7 +43,7 @@ export function OrdersPage() {
     <div>
       <h1 className="mb-6 text-2xl font-bold">My Orders</h1>
       <div className="space-y-4">
-        {orders.map((order,index) => (
+        {orders.map((order, index) => (
           <Link key={order.id} to={`/orders/${order.id}`}>
             <Card className="transition-shadow hover:shadow-md">
               <CardContent className="flex items-center justify-between p-4">
