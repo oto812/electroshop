@@ -7,7 +7,7 @@ export class GeocodingService {
         try {
             const encoded = encodeURIComponent(address);
             const response = await fetch(
-                'https://nominatim.openstreetmap.org/search?format=json&q=${encoded}',
+                `https://nominatim.openstreetmap.org/search?format=json&q=${encoded}`,
                 {
                     headers: { 'User-Agent': 'Electroshop-MVP/1.0' },
                 },

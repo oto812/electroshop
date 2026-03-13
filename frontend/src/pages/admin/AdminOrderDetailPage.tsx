@@ -5,6 +5,8 @@ import { createSocket } from "@/lib/socket";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import "../../lib/leaflet-setup";
+import { OrderRouteMap } from "@/components/admin/OrderRouteMap";
 import {
   Select,
   SelectContent,
@@ -27,6 +29,8 @@ interface Order {
   totalAmount: number;
   status: string;
   deliveryAddress: string;
+  deliveryLatitude?: number | null;
+  deliveryLongitude?: number | null;
   createdAt: string;
   user?: { email: string };
   orderItems: OrderItem[];
@@ -79,36 +83,43 @@ export function AdminOrderDetailPage() {
   }, [id]);
 
   useEffect(() => {
-  const socket = createSocket();
-  socketRef.current = socket;
+    const socket = createSocket();
+    socketRef.current = socket;
 
-  socket.on('chatHistory', (history: ChatMessage[]) => {
-    setMessages(history);
-  });
-
-  socket.on('chatMessage', (msg: ChatMessage) => {
-    setMessages((prev) => {
-      if (prev.some((m) => m.timestamp === msg.timestamp && m.message === msg.message)) {
-        return prev;
-      }
-      return [...prev, msg];
+    socket.on("chatHistory", (history: ChatMessage[]) => {
+      setMessages(history);
     });
-  });
 
-  socket.on('orderStatusUpdate', (data: { orderId: number; status: string }) => {
-    setOrder((prev) => (prev ? { ...prev, status: data.status } : prev));
-  });
+    socket.on("chatMessage", (msg: ChatMessage) => {
+      setMessages((prev) => {
+        if (
+          prev.some(
+            (m) => m.timestamp === msg.timestamp && m.message === msg.message,
+          )
+        ) {
+          return prev;
+        }
+        return [...prev, msg];
+      });
+    });
 
-  socket.on('connect', () => {
-    socket.emit('joinOrderRoom', { orderId: Number(id) });
-  });
+    socket.on(
+      "orderStatusUpdate",
+      (data: { orderId: number; status: string }) => {
+        setOrder((prev) => (prev ? { ...prev, status: data.status } : prev));
+      },
+    );
 
-  socket.connect();
+    socket.on("connect", () => {
+      socket.emit("joinOrderRoom", { orderId: Number(id) });
+    });
 
-  return () => {
-    socket.disconnect();
-  };
-}, [id]);
+    socket.connect();
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [id]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -125,16 +136,16 @@ export function AdminOrderDetailPage() {
   };
 
   const sendMessage = () => {
-  if (!messageInput.trim() || !socketRef.current) return;
+    if (!messageInput.trim() || !socketRef.current) return;
 
-  socketRef.current.emit('sendChatMessage', {
-    orderId: Number(id),
-    message: messageInput.trim(),
-    senderRole: 'admin',
-  });
+    socketRef.current.emit("sendChatMessage", {
+      orderId: Number(id),
+      message: messageInput.trim(),
+      senderRole: "admin",
+    });
 
-  setMessageInput('');
-};
+    setMessageInput("");
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -157,6 +168,12 @@ export function AdminOrderDetailPage() {
       <div className="py-12 text-center text-gray-500">Order not found</div>
     );
   }
+
+  const hasValidRouteCoordinates =
+    order.deliveryLatitude != null &&
+    order.deliveryLongitude != null &&
+    order.deliveryLatitude !== 0 &&
+    order.deliveryLongitude !== 0;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -200,6 +217,21 @@ export function AdminOrderDetailPage() {
           </p>
         </CardContent>
       </Card>
+
+      {hasValidRouteCoordinates && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Delivery Route</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <OrderRouteMap
+              deliveryLatitude={order.deliveryLatitude!}
+              deliveryLongitude={order.deliveryLongitude!}
+              deliveryAddress={order.deliveryAddress}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="mb-6">
         <CardHeader>

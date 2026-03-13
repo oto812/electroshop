@@ -10,6 +10,7 @@ import {
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 interface ChatMessage {
   orderId: number;
@@ -23,8 +24,10 @@ export class AppGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
   @WebSocketServer()
   server: Server;
 
+  constructor(private prisma: PrismaService) {}
+
+
   private logger = new Logger('AppGateway');
-  private chatHistory = new Map<number, ChatMessage[]>();
 
   afterInit() {
     this.logger.log('WebSocket Gateway initialized');
@@ -38,43 +41,52 @@ export class AppGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     this.logger.log(`Client disconnected: ${client.id}`);
   }
 
-  @SubscribeMessage('joinOrderRoom')
-  handleJoinOrderRoom(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: { orderId: number },
-  ) {
-    const room = `order-${data.orderId}`;
-    client.join(room);
-    this.logger.log(`Client ${client.id} joined room ${room}`);
+@SubscribeMessage('joinOrderRoom')
+async handleJoinOrderRoom(
+  @ConnectedSocket() client: Socket,
+  @MessageBody() data: { orderId: number },
+) {
+  const room = `order-${data.orderId}`;
+  client.join(room);
 
-    const history = this.chatHistory.get(data.orderId) || [];
-    this.logger.log(`Sending ${history.length} messages to ${client.id}`);
-    client.emit('chatHistory', history);
+  const dbMessages = await this.prisma.chatMessage.findMany({
+    where: { orderId: data.orderId },
+    orderBy: { createdAt: 'asc' },
+  });
 
-    return { event: 'joinedRoom', room };
-  }
+  const history: ChatMessage[] = dbMessages.map((m) => ({
+    orderId: m.orderId,
+    message: m.message,
+    senderRole: m.senderRole,
+    timestamp: m.createdAt.toISOString(),
+  }));
 
-  @SubscribeMessage('sendChatMessage')
-  handleSendChatMessage(
-    @MessageBody() data: { orderId: number; message: string; senderRole: string },
-  ) {
-    const payload: ChatMessage = {
+  client.emit('chatHistory', history);
+  return { event: 'joinedRoom', room };
+}
+
+@SubscribeMessage('sendChatMessage')
+async handleSendChatMessage(
+  @MessageBody() data: { orderId: number; message: string; senderRole: string },
+) {
+  const saved = await this.prisma.chatMessage.create({
+    data: {
       orderId: data.orderId,
       message: data.message,
       senderRole: data.senderRole,
-      timestamp: new Date().toISOString(),
-    };
+    },
+  });
 
-    if (!this.chatHistory.has(data.orderId)) {
-      this.chatHistory.set(data.orderId, []);
-    }
-    this.chatHistory.get(data.orderId)!.push(payload);
+  const payload: ChatMessage = {
+    orderId: saved.orderId,
+    message: saved.message,
+    senderRole: saved.senderRole,
+    timestamp: saved.createdAt.toISOString(),
+  };
 
-    this.logger.log(`Chat message in order ${data.orderId}: [${data.senderRole}] ${data.message}`);
-
-    this.server.to(`order-${data.orderId}`).emit('chatMessage', payload);
-    return payload;
-  }
+  this.server.to(`order-${data.orderId}`).emit('chatMessage', payload);
+  return payload;
+}
 
   @SubscribeMessage('joinAdminDashboard')
   handleJoinAdminDashboard(@ConnectedSocket() client: Socket) {
