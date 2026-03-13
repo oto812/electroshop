@@ -72,7 +72,7 @@ export function OrdersPage() {
             <Card className="transition-shadow hover:shadow-md">
               <CardContent className="flex items-center justify-between p-4">
                 <div>
-                  <p className="font-semibold">Order #{order.id - index}</p>
+                  <p className="font-semibold">Order #{orders.length - index}</p>
                   <p className="text-sm text-gray-500">
                     {new Date(order.createdAt).toLocaleDateString()}
                   </p>
