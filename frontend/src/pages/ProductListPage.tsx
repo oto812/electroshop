@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useProducts } from '@/lib/queries';
 import { useCart } from '@/context/CartContext';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ function ProductSkeleton() {
 export function ProductListPage() {
   const { data: products = [], isLoading } = useProducts();
   const { addToCart } = useCart();
+  const { t } = useTranslation();
 
   const handleAddToCart = async (product: typeof products[number]) => {
     try {
@@ -31,9 +33,9 @@ export function ProductListPage() {
         { id: product.id, name: product.name, price: product.price, imageUrl: product.imageUrl },
         1
       );
-      toast.success(`${product.name} added to cart`);
+      toast.success(t('products.addedToCart', { name: product.name }));
     } catch {
-      toast.error('Failed to add to cart');
+      toast.error(t('products.addToCartError'));
     }
   };
 
@@ -50,14 +52,14 @@ export function ProductListPage() {
   if (products.length === 0) {
     return (
       <div className="py-12 text-center text-gray-500">
-        No products available at the moment.
+        {t('products.empty')}
       </div>
     );
   }
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold">Products</h1>
+      <h1 className="mb-6 text-2xl font-bold">{t('products.title')}</h1>
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {products.map((product) => (
           <Card key={product.id} className="flex flex-col">
@@ -75,7 +77,7 @@ export function ProductListPage() {
             </CardContent>
             <CardFooter>
               <Button className="w-full" onClick={() => handleAddToCart(product)}>
-                Add to Cart
+                {t('products.addToCart')}
               </Button>
             </CardFooter>
           </Card>

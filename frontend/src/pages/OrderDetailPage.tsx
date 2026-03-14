@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { useOrderDetail } from "@/lib/queries";
+import { useTranslation } from "react-i18next";
+import { useOrderDetail, queryKeys } from "@/lib/queries";
 import { useQueryClient } from "@tanstack/react-query";
-import { queryKeys } from "@/lib/queries";
 import { createSocket } from "@/lib/socket";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +30,7 @@ export function OrderDetailPage() {
   const [searchParams] = useSearchParams();
   const confirmed = searchParams.get("confirmed") === "true";
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   const { data: order, isLoading } = useOrderDetail(id);
 
@@ -40,7 +41,6 @@ export function OrderDetailPage() {
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // WebSocket connection + polling fallback
   useEffect(() => {
     const socket = createSocket();
     socketRef.current = socket;
@@ -62,7 +62,7 @@ export function OrderDetailPage() {
       queryClient.setQueryData(queryKeys.order(id), (old: any) =>
         old ? { ...old, status: data.status } : old
       );
-      toast.info(`Order status updated to ${data.status}`);
+      toast.info(t('orderDetail.statusUpdated', { status: data.status }));
     });
 
     socket.on('connect', () => {
@@ -78,7 +78,7 @@ export function OrderDetailPage() {
             const { data } = await api.get(`/orders/${id}`);
             queryClient.setQueryData(queryKeys.order(id), (old: any) => {
               if (old && old.status !== data.status) {
-                toast.info(`Order status updated to ${data.status}`);
+                toast.info(t('orderDetail.statusUpdated', { status: data.status }));
                 return { ...old, status: data.status };
               }
               return old;
@@ -93,22 +93,19 @@ export function OrderDetailPage() {
       if (pollingRef.current) clearInterval(pollingRef.current);
       socket.disconnect();
     };
-  }, [id, queryClient]);
+  }, [id, queryClient, t]);
 
-  // Scroll chat to bottom
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const sendMessage = () => {
     if (!messageInput.trim() || !socketRef.current) return;
-
     socketRef.current.emit('sendChatMessage', {
       orderId: Number(id),
       message: messageInput.trim(),
       senderRole: 'user',
     });
-
     setMessageInput('');
   };
 
@@ -129,46 +126,38 @@ export function OrderDetailPage() {
   }
 
   if (!order) {
-    return (
-      <div className="py-12 text-center text-gray-500">Order not found</div>
-    );
+    return <div className="py-12 text-center text-gray-500">{t('orderDetail.notFound')}</div>;
   }
 
   return (
     <div className="mx-auto max-w-3xl">
       {confirmed && (
         <div className="mb-6 rounded-lg bg-green-50 p-4 text-center">
-          <h2 className="text-xl font-bold text-green-800">
-            Thank you for your order!
-          </h2>
-          <p className="text-green-600">
-            Your order has been placed successfully.
-          </p>
+          <h2 className="text-xl font-bold text-green-800">{t('orderDetail.confirmed')}</h2>
+          <p className="text-green-600">{t('orderDetail.confirmedDesc')}</p>
         </div>
       )}
 
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold">
-          Order — {new Date(order.createdAt).toLocaleDateString()}
+          {t('orderDetail.heading', { date: new Date(order.createdAt).toLocaleDateString() })}
         </h1>
-        <span
-          className={`rounded-full px-4 py-1 text-sm font-medium ${statusColors[order.status] || "bg-gray-100 text-gray-800"}`}
-        >
-          {order.status}
+        <span className={`rounded-full px-4 py-1 text-sm font-medium ${statusColors[order.status] || "bg-gray-100 text-gray-800"}`}>
+          {t(`status.${order.status}`, order.status)}
         </span>
       </div>
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Order Details</CardTitle>
+          <CardTitle>{t('orderDetail.details')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           <p>
-            <span className="font-medium">Date:</span>{" "}
+            <span className="font-medium">{t('orderDetail.dateLabel')}</span>{" "}
             {new Date(order.createdAt).toLocaleString()}
           </p>
           <p>
-            <span className="font-medium">Delivery Address:</span>{" "}
+            <span className="font-medium">{t('orderDetail.addressLabel')}</span>{" "}
             {order.deliveryAddress}
           </p>
         </CardContent>
@@ -176,16 +165,16 @@ export function OrderDetailPage() {
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Items</CardTitle>
+          <CardTitle>{t('orderDetail.items')}</CardTitle>
         </CardHeader>
         <CardContent>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left">
-                <th className="pb-2">Product</th>
-                <th className="pb-2">Qty</th>
-                <th className="pb-2 text-right">Price</th>
-                <th className="pb-2 text-right">Subtotal</th>
+                <th className="pb-2">{t('orderDetail.product')}</th>
+                <th className="pb-2">{t('orderDetail.qty')}</th>
+                <th className="pb-2 text-right">{t('orderDetail.price')}</th>
+                <th className="pb-2 text-right">{t('orderDetail.subtotal')}</th>
               </tr>
             </thead>
             <tbody>
@@ -193,39 +182,27 @@ export function OrderDetailPage() {
                 <tr key={item.id} className="border-b last:border-0">
                   <td className="py-2">{item.product.name}</td>
                   <td className="py-2">{item.quantity}</td>
-                  <td className="py-2 text-right">
-                    ${item.priceAtOrder.toFixed(2)}
-                  </td>
-                  <td className="py-2 text-right">
-                    ${(item.priceAtOrder * item.quantity).toFixed(2)}
-                  </td>
+                  <td className="py-2 text-right">${item.priceAtOrder.toFixed(2)}</td>
+                  <td className="py-2 text-right">${(item.priceAtOrder * item.quantity).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={3} className="pt-3 text-right font-bold">
-                  Total
-                </td>
-                <td className="pt-3 text-right font-bold">
-                  ${order.totalAmount.toFixed(2)}
-                </td>
+                <td colSpan={3} className="pt-3 text-right font-bold">{t('orderDetail.total')}</td>
+                <td className="pt-3 text-right font-bold">${order.totalAmount.toFixed(2)}</td>
               </tr>
             </tfoot>
           </table>
         </CardContent>
       </Card>
 
-      {/* Chat Panel */}
       <Card>
-        <CardHeader
-          className="cursor-pointer"
-          onClick={() => setChatOpen(!chatOpen)}
-        >
+        <CardHeader className="cursor-pointer" onClick={() => setChatOpen(!chatOpen)}>
           <CardTitle className="flex items-center justify-between">
-            Chat with Support
+            {t('orderDetail.chat')}
             <span className="text-sm font-normal text-gray-500">
-              {chatOpen ? "▲ Collapse" : "▼ Expand"}
+              {chatOpen ? t('orderDetail.collapse') : t('orderDetail.expand')}
             </span>
           </CardTitle>
         </CardHeader>
@@ -233,26 +210,13 @@ export function OrderDetailPage() {
           <CardContent>
             <div className="mb-4 h-64 overflow-y-auto rounded border bg-gray-50 p-3">
               {messages.length === 0 && (
-                <p className="text-center text-sm text-gray-400">
-                  No messages yet. Start a conversation!
-                </p>
+                <p className="text-center text-sm text-gray-400">{t('orderDetail.noMessages')}</p>
               )}
               {messages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`mb-2 flex ${msg.senderRole === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-xs rounded-lg px-3 py-2 text-sm ${
-                      msg.senderRole === "user"
-                        ? "bg-blue-500 text-white"
-                        : "bg-gray-200 text-gray-800"
-                    }`}
-                  >
+                <div key={i} className={`mb-2 flex ${msg.senderRole === "user" ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-xs rounded-lg px-3 py-2 text-sm ${msg.senderRole === "user" ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-800"}`}>
                     <p>{msg.message}</p>
-                    <p
-                      className={`mt-1 text-xs ${msg.senderRole === "user" ? "text-blue-100" : "text-gray-500"}`}
-                    >
+                    <p className={`mt-1 text-xs ${msg.senderRole === "user" ? "text-blue-100" : "text-gray-500"}`}>
                       {new Date(msg.timestamp).toLocaleTimeString()}
                     </p>
                   </div>
@@ -265,10 +229,10 @@ export function OrderDetailPage() {
                 value={messageInput}
                 onChange={(e) => setMessageInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Type a message..."
+                placeholder={t('orderDetail.messagePlaceholder')}
               />
               <Button onClick={sendMessage} disabled={!messageInput.trim()}>
-                Send
+                {t('orderDetail.send')}
               </Button>
             </div>
           </CardContent>

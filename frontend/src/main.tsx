@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import 'leaflet/dist/leaflet.css';
 import './lib/leaflet-setup';
+import './lib/i18n';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 
