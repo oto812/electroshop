@@ -1,18 +1,8 @@
-import { useEffect, useState } from 'react';
-import api from '@/lib/axios';
+import { useProducts } from '@/lib/queries';
 import { useCart } from '@/context/CartContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-
-interface Product {
-  id: number;
-  name: string;
-  description: string;
-  imageUrl: string;
-  price: number;
-  stockQuantity: number;
-}
 
 function ProductSkeleton() {
   return (
@@ -32,25 +22,10 @@ function ProductSkeleton() {
 }
 
 export function ProductListPage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: products = [], isLoading } = useProducts();
   const { addToCart } = useCart();
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const { data } = await api.get('/products');
-        setProducts(data.map((p: any) => ({ ...p, price: Number(p.price) })));
-      } catch {
-        toast.error('Failed to load products');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProducts();
-  }, []);
-
-  const handleAddToCart = async (product: Product) => {
+  const handleAddToCart = async (product: typeof products[number]) => {
     try {
       await addToCart(
         { id: product.id, name: product.name, price: product.price, imageUrl: product.imageUrl },
@@ -62,7 +37,7 @@ export function ProductListPage() {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (

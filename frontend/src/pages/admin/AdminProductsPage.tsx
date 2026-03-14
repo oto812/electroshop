@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import api from '@/lib/axios';
+import { useState } from 'react';
+import { useAdminProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, type Product } from '@/lib/queries';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,41 +13,19 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 
-interface Product {
-  id: number;
-  name: string;
-  description: string;
-  imageUrl: string;
-  price: number;
-  stockQuantity: number;
-}
-
 const emptyForm = { name: '', description: '', imageUrl: '', price: 0, stockQuantity: 0 };
 
 export function AdminProductsPage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: products = [], isLoading } = useAdminProducts();
+  const createProduct = useCreateProduct();
+  const updateProduct = useUpdateProduct();
+  const deleteProduct = useDeleteProduct();
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
   const [form, setForm] = useState(emptyForm);
-  const [submitting, setSubmitting] = useState(false);
-
-  const fetchProducts = async () => {
-    try {
-      const { data } = await api.get('/products/admin');
-      setProducts(data.map((p: any) => ({ ...p, price: Number(p.price) })));
-    } catch {
-      toast.error('Failed to load products');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchProducts();
-  }, []);
 
   const openAddDialog = () => {
     setEditingProduct(null);
@@ -74,46 +52,40 @@ export function AdminProductsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
+    const payload = {
+      ...form,
+      price: Number(form.price),
+      stockQuantity: Number(form.stockQuantity),
+    };
 
     try {
       if (editingProduct) {
-        await api.patch(`/products/${editingProduct.id}`, {
-          ...form,
-          price: Number(form.price),
-          stockQuantity: Number(form.stockQuantity),
-        });
+        await updateProduct.mutateAsync({ id: editingProduct.id, ...payload });
         toast.success('Product updated');
       } else {
-        await api.post('/products', {
-          ...form,
-          price: Number(form.price),
-          stockQuantity: Number(form.stockQuantity),
-        });
+        await createProduct.mutateAsync(payload);
         toast.success('Product created');
       }
       setDialogOpen(false);
-      fetchProducts();
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to save product');
-    } finally {
-      setSubmitting(false);
     }
   };
 
   const handleDelete = async () => {
     if (!deletingProduct) return;
     try {
-      await api.delete(`/products/${deletingProduct.id}`);
+      await deleteProduct.mutateAsync(deletingProduct.id);
       toast.success('Product deleted');
       setDeleteDialogOpen(false);
-      fetchProducts();
     } catch {
       toast.error('Failed to delete product');
     }
   };
 
-  if (loading) {
+  const submitting = createProduct.isPending || updateProduct.isPending;
+
+  if (isLoading) {
     return <div className="animate-pulse space-y-4">
       <div className="h-8 w-48 rounded bg-gray-200" />
       <div className="h-64 rounded bg-gray-200" />
@@ -228,7 +200,7 @@ export function AdminProductsPage() {
           <p>Are you sure you want to delete <strong>{deletingProduct?.name}</strong>? This action cannot be undone.</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete}>Delete</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleteProduct.isPending}>Delete</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
