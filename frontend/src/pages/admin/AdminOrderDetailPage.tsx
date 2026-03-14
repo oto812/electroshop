@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useOrderDetail, useUpdateOrderStatus, queryKeys } from "@/lib/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { createSocket } from "@/lib/socket";
@@ -36,6 +37,7 @@ const statusColors: Record<string, string> = {
 export function AdminOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const { data: order, isLoading } = useOrderDetail(id);
   const updateStatus = useUpdateOrderStatus();
 
@@ -55,25 +57,18 @@ export function AdminOrderDetailPage() {
 
     socket.on("chatMessage", (msg: ChatMessage) => {
       setMessages((prev) => {
-        if (
-          prev.some(
-            (m) => m.timestamp === msg.timestamp && m.message === msg.message,
-          )
-        ) {
+        if (prev.some((m) => m.timestamp === msg.timestamp && m.message === msg.message)) {
           return prev;
         }
         return [...prev, msg];
       });
     });
 
-    socket.on(
-      "orderStatusUpdate",
-      (data: { orderId: number; status: string }) => {
-        queryClient.setQueryData(queryKeys.order(id), (old: any) =>
-          old ? { ...old, status: data.status } : old
-        );
-      },
-    );
+    socket.on("orderStatusUpdate", (data: { orderId: number; status: string }) => {
+      queryClient.setQueryData(queryKeys.order(id), (old: any) =>
+        old ? { ...old, status: data.status } : old
+      );
+    });
 
     socket.on("connect", () => {
       socket.emit("joinOrderRoom", { orderId: Number(id) });
@@ -96,22 +91,20 @@ export function AdminOrderDetailPage() {
     );
     try {
       await updateStatus.mutateAsync({ id: Number(id), status: newStatus });
-      toast.success(`Status updated to ${newStatus}`);
+      toast.success(t('adminOrderDetail.statusUpdated', { status: t(`status.${newStatus}`) }));
     } catch {
       queryClient.invalidateQueries({ queryKey: queryKeys.order(id) });
-      toast.error("Failed to update status");
+      toast.error(t('adminOrderDetail.statusError'));
     }
   };
 
   const sendMessage = () => {
     if (!messageInput.trim() || !socketRef.current) return;
-
     socketRef.current.emit("sendChatMessage", {
       orderId: Number(id),
       message: messageInput.trim(),
       senderRole: "admin",
     });
-
     setMessageInput("");
   };
 
@@ -132,9 +125,7 @@ export function AdminOrderDetailPage() {
   }
 
   if (!order) {
-    return (
-      <div className="py-12 text-center text-gray-500">Order not found</div>
-    );
+    return <div className="py-12 text-center text-gray-500">{t('adminOrderDetail.notFound')}</div>;
   }
 
   const hasValidRouteCoordinates =
@@ -146,7 +137,7 @@ export function AdminOrderDetailPage() {
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Order #{order.id}</h1>
+        <h1 className="text-2xl font-bold">{t('adminOrderDetail.heading', { id: order.id })}</h1>
         <Select value={order.status} onValueChange={handleStatusChange}>
           <SelectTrigger className="w-44">
             <SelectValue />
@@ -154,10 +145,8 @@ export function AdminOrderDetailPage() {
           <SelectContent>
             {statuses.map((s) => (
               <SelectItem key={s} value={s}>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs ${statusColors[s]}`}
-                >
-                  {s}
+                <span className={`rounded-full px-2 py-0.5 text-xs ${statusColors[s]}`}>
+                  {t(`status.${s}`)}
                 </span>
               </SelectItem>
             ))}
@@ -167,20 +156,20 @@ export function AdminOrderDetailPage() {
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Order Details</CardTitle>
+          <CardTitle>{t('adminOrderDetail.details')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {order.user && (
             <p>
-              <span className="font-medium">Customer:</span> {order.user.email}
+              <span className="font-medium">{t('adminOrderDetail.customerLabel')}</span> {order.user.email}
             </p>
           )}
           <p>
-            <span className="font-medium">Date:</span>{" "}
+            <span className="font-medium">{t('adminOrderDetail.dateLabel')}</span>{" "}
             {new Date(order.createdAt).toLocaleString()}
           </p>
           <p>
-            <span className="font-medium">Delivery Address:</span>{" "}
+            <span className="font-medium">{t('adminOrderDetail.addressLabel')}</span>{" "}
             {order.deliveryAddress}
           </p>
         </CardContent>
@@ -189,7 +178,7 @@ export function AdminOrderDetailPage() {
       {hasValidRouteCoordinates && (
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Delivery Route</CardTitle>
+            <CardTitle>{t('adminOrderDetail.route')}</CardTitle>
           </CardHeader>
           <CardContent>
             <OrderRouteMap
@@ -203,16 +192,16 @@ export function AdminOrderDetailPage() {
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Items</CardTitle>
+          <CardTitle>{t('adminOrderDetail.items')}</CardTitle>
         </CardHeader>
         <CardContent>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left">
-                <th className="pb-2">Product</th>
-                <th className="pb-2">Qty</th>
-                <th className="pb-2 text-right">Price</th>
-                <th className="pb-2 text-right">Subtotal</th>
+                <th className="pb-2">{t('adminOrderDetail.product')}</th>
+                <th className="pb-2">{t('adminOrderDetail.qty')}</th>
+                <th className="pb-2 text-right">{t('adminOrderDetail.price')}</th>
+                <th className="pb-2 text-right">{t('adminOrderDetail.subtotal')}</th>
               </tr>
             </thead>
             <tbody>
@@ -220,39 +209,27 @@ export function AdminOrderDetailPage() {
                 <tr key={item.id} className="border-b last:border-0">
                   <td className="py-2">{item.product.name}</td>
                   <td className="py-2">{item.quantity}</td>
-                  <td className="py-2 text-right">
-                    ${item.priceAtOrder.toFixed(2)}
-                  </td>
-                  <td className="py-2 text-right">
-                    ${(item.priceAtOrder * item.quantity).toFixed(2)}
-                  </td>
+                  <td className="py-2 text-right">${item.priceAtOrder.toFixed(2)}</td>
+                  <td className="py-2 text-right">${(item.priceAtOrder * item.quantity).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={3} className="pt-3 text-right font-bold">
-                  Total
-                </td>
-                <td className="pt-3 text-right font-bold">
-                  ${order.totalAmount.toFixed(2)}
-                </td>
+                <td colSpan={3} className="pt-3 text-right font-bold">{t('adminOrderDetail.total')}</td>
+                <td className="pt-3 text-right font-bold">${order.totalAmount.toFixed(2)}</td>
               </tr>
             </tfoot>
           </table>
         </CardContent>
       </Card>
 
-      {/* Chat Panel */}
       <Card>
-        <CardHeader
-          className="cursor-pointer"
-          onClick={() => setChatOpen(!chatOpen)}
-        >
+        <CardHeader className="cursor-pointer" onClick={() => setChatOpen(!chatOpen)}>
           <CardTitle className="flex items-center justify-between">
-            Chat with Customer
+            {t('adminOrderDetail.chat')}
             <span className="text-sm font-normal text-gray-500">
-              {chatOpen ? "▲ Collapse" : "▼ Expand"}
+              {chatOpen ? t('adminOrderDetail.collapse') : t('adminOrderDetail.expand')}
             </span>
           </CardTitle>
         </CardHeader>
@@ -260,29 +237,16 @@ export function AdminOrderDetailPage() {
           <CardContent>
             <div className="mb-4 h-64 overflow-y-auto rounded border bg-gray-50 p-3">
               {messages.length === 0 && (
-                <p className="text-center text-sm text-gray-400">
-                  No messages yet
-                </p>
+                <p className="text-center text-sm text-gray-400">{t('adminOrderDetail.noMessages')}</p>
               )}
               {messages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`mb-2 flex ${msg.senderRole === "admin" ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-xs rounded-lg px-3 py-2 text-sm ${
-                      msg.senderRole === "admin"
-                        ? "bg-blue-500 text-white"
-                        : "bg-gray-200 text-gray-800"
-                    }`}
-                  >
+                <div key={i} className={`mb-2 flex ${msg.senderRole === "admin" ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-xs rounded-lg px-3 py-2 text-sm ${msg.senderRole === "admin" ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-800"}`}>
                     <p className="text-xs font-medium mb-1">
-                      {msg.senderRole === "admin" ? "You" : "Customer"}
+                      {msg.senderRole === "admin" ? t('adminOrderDetail.you') : t('adminOrderDetail.customer')}
                     </p>
                     <p>{msg.message}</p>
-                    <p
-                      className={`mt-1 text-xs ${msg.senderRole === "admin" ? "text-blue-100" : "text-gray-500"}`}
-                    >
+                    <p className={`mt-1 text-xs ${msg.senderRole === "admin" ? "text-blue-100" : "text-gray-500"}`}>
                       {new Date(msg.timestamp).toLocaleTimeString()}
                     </p>
                   </div>
@@ -295,10 +259,10 @@ export function AdminOrderDetailPage() {
                 value={messageInput}
                 onChange={(e) => setMessageInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Type a message..."
+                placeholder={t('adminOrderDetail.messagePlaceholder')}
               />
               <Button onClick={sendMessage} disabled={!messageInput.trim()}>
-                Send
+                {t('adminOrderDetail.send')}
               </Button>
             </div>
           </CardContent>

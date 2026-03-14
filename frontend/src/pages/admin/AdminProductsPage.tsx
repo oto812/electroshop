@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAdminProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, type Product } from '@/lib/queries';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent} from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -20,6 +21,7 @@ export function AdminProductsPage() {
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
   const deleteProduct = useDeleteProduct();
+  const { t } = useTranslation();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -61,14 +63,14 @@ export function AdminProductsPage() {
     try {
       if (editingProduct) {
         await updateProduct.mutateAsync({ id: editingProduct.id, ...payload });
-        toast.success('Product updated');
+        toast.success(t('adminProducts.updateSuccess'));
       } else {
         await createProduct.mutateAsync(payload);
-        toast.success('Product created');
+        toast.success(t('adminProducts.createSuccess'));
       }
       setDialogOpen(false);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to save product');
+      toast.error(err.response?.data?.message || t('adminProducts.saveError'));
     }
   };
 
@@ -76,27 +78,29 @@ export function AdminProductsPage() {
     if (!deletingProduct) return;
     try {
       await deleteProduct.mutateAsync(deletingProduct.id);
-      toast.success('Product deleted');
+      toast.success(t('adminProducts.deleteSuccess'));
       setDeleteDialogOpen(false);
     } catch {
-      toast.error('Failed to delete product');
+      toast.error(t('adminProducts.deleteError'));
     }
   };
 
   const submitting = createProduct.isPending || updateProduct.isPending;
 
   if (isLoading) {
-    return <div className="animate-pulse space-y-4">
-      <div className="h-8 w-48 rounded bg-gray-200" />
-      <div className="h-64 rounded bg-gray-200" />
-    </div>;
+    return (
+      <div className="animate-pulse space-y-4">
+        <div className="h-8 w-48 rounded bg-gray-200" />
+        <div className="h-64 rounded bg-gray-200" />
+      </div>
+    );
   }
 
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Products</h1>
-        <Button onClick={openAddDialog}>Add Product</Button>
+        <h1 className="text-2xl font-bold">{t('adminProducts.title')}</h1>
+        <Button onClick={openAddDialog}>{t('adminProducts.addProduct')}</Button>
       </div>
 
       <Card>
@@ -104,10 +108,10 @@ export function AdminProductsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-gray-50 text-left">
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Price</th>
-                <th className="px-4 py-3">Stock</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th className="px-4 py-3">{t('adminProducts.colName')}</th>
+                <th className="px-4 py-3">{t('adminProducts.colPrice')}</th>
+                <th className="px-4 py-3">{t('adminProducts.colStock')}</th>
+                <th className="px-4 py-3 text-right">{t('adminProducts.colActions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -123,10 +127,10 @@ export function AdminProductsPage() {
                   <td className="px-4 py-3 text-right">
                     <div className="flex justify-end gap-2">
                       <Button variant="outline" size="sm" onClick={() => openEditDialog(product)}>
-                        Edit
+                        {t('adminProducts.edit')}
                       </Button>
                       <Button variant="destructive" size="sm" onClick={() => openDeleteDialog(product)}>
-                        Delete
+                        {t('adminProducts.delete')}
                       </Button>
                     </div>
                   </td>
@@ -141,24 +145,24 @@ export function AdminProductsPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingProduct ? 'Edit Product' : 'Add Product'}</DialogTitle>
+            <DialogTitle>{editingProduct ? t('adminProducts.editTitle') : t('adminProducts.addTitle')}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label>Name</Label>
+              <Label>{t('adminProducts.nameLabel')}</Label>
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
             </div>
             <div className="space-y-2">
-              <Label>Description</Label>
+              <Label>{t('adminProducts.descriptionLabel')}</Label>
               <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required />
             </div>
             <div className="space-y-2">
-              <Label>Image URL</Label>
+              <Label>{t('adminProducts.imageUrlLabel')}</Label>
               <Input value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} required />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Price</Label>
+                <Label>{t('adminProducts.priceLabel')}</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -169,7 +173,7 @@ export function AdminProductsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Stock Quantity</Label>
+                <Label>{t('adminProducts.stockLabel')}</Label>
                 <Input
                   type="number"
                   min="0"
@@ -181,10 +185,10 @@ export function AdminProductsPage() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                Cancel
+                {t('adminProducts.cancel')}
               </Button>
               <Button type="submit" disabled={submitting}>
-                {submitting ? 'Saving...' : editingProduct ? 'Update' : 'Create'}
+                {submitting ? t('adminProducts.saving') : editingProduct ? t('adminProducts.update') : t('adminProducts.create')}
               </Button>
             </DialogFooter>
           </form>
@@ -195,12 +199,16 @@ export function AdminProductsPage() {
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Product</DialogTitle>
+            <DialogTitle>{t('adminProducts.deleteTitle')}</DialogTitle>
           </DialogHeader>
-          <p>Are you sure you want to delete <strong>{deletingProduct?.name}</strong>? This action cannot be undone.</p>
+          <p>{t('adminProducts.deleteConfirm', { name: deletingProduct?.name })}</p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={deleteProduct.isPending}>Delete</Button>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+              {t('adminProducts.cancel')}
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleteProduct.isPending}>
+              {t('adminProducts.delete')}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

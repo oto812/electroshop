@@ -1,4 +1,5 @@
 import { useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useCart } from '@/context/CartContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -7,6 +8,7 @@ import { toast } from 'sonner';
 export function CartPage() {
   const { cartItems, updateQuantity, removeFromCart } = useCart();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
@@ -14,25 +16,25 @@ export function CartPage() {
     try {
       await updateQuantity(productId, newQuantity);
     } catch {
-      toast.error('Failed to update quantity');
+      toast.error(t('cart.updateError'));
     }
   };
 
   const handleRemove = async (productId: number) => {
     try {
       await removeFromCart(productId);
-      toast.success('Item removed from cart');
+      toast.success(t('cart.removeSuccess'));
     } catch {
-      toast.error('Failed to remove item');
+      toast.error(t('cart.removeError'));
     }
   };
 
   if (cartItems.length === 0) {
     return (
       <div className="flex flex-col items-center gap-4 py-12">
-        <p className="text-lg text-gray-500">Your cart is empty</p>
+        <p className="text-lg text-gray-500">{t('cart.empty')}</p>
         <Link to="/">
-          <Button>Continue Shopping</Button>
+          <Button>{t('cart.continueShopping')}</Button>
         </Link>
       </div>
     );
@@ -40,7 +42,7 @@ export function CartPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold">Shopping Cart</h1>
+      <h1 className="mb-6 text-2xl font-bold">{t('cart.title')}</h1>
       <div className="space-y-4">
         {cartItems.map((item) => (
           <Card key={item.productId}>
@@ -79,7 +81,7 @@ export function CartPage() {
                 size="sm"
                 onClick={() => handleRemove(item.productId)}
               >
-                Remove
+                {t('cart.remove')}
               </Button>
             </CardContent>
           </Card>
@@ -87,9 +89,9 @@ export function CartPage() {
       </div>
 
       <div className="mt-6 flex items-center justify-between rounded-lg border p-4">
-        <span className="text-xl font-bold">Total: ${total.toFixed(2)}</span>
+        <span className="text-xl font-bold">{t('cart.total', { amount: total.toFixed(2) })}</span>
         <Button size="lg" onClick={() => navigate('/checkout')}>
-          Proceed to Checkout
+          {t('cart.checkout')}
         </Button>
       </div>
     </div>
