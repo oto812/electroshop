@@ -1,9 +1,85 @@
+import styled from 'styled-components';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useCart } from '@/context/CartContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { PageTitle, EmptyState } from '@/styles/shared';
 import { toast } from 'sonner';
+
+// ─── Styled components ────────────────────────────────────────────────────────
+
+const ItemList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space[4]};
+`;
+
+const ItemContent = styled(CardContent)`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space[4]};
+  padding: ${({ theme }) => theme.space[4]};
+`;
+
+const ItemImage = styled.img`
+  height: 5rem;
+  width: 5rem;
+  border-radius: ${({ theme }) => theme.radius.md};
+  object-fit: cover;
+  flex-shrink: 0;
+`;
+
+const ItemInfo = styled.div`
+  flex: 1;
+`;
+
+const ItemName = styled.h3`
+  font-weight: ${({ theme }) => theme.weight.semibold};
+  margin: 0 0 ${({ theme }) => theme.space[1]};
+  font-size: ${({ theme }) => theme.font.base};
+`;
+
+const ItemPrice = styled.p`
+  color: ${({ theme }) => theme.color.gray600};
+  margin: 0;
+  font-size: ${({ theme }) => theme.font.base};
+`;
+
+const QuantityControls = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space[2]};
+`;
+
+const QuantityDisplay = styled.span`
+  width: 2rem;
+  text-align: center;
+`;
+
+const ItemSubtotal = styled.p`
+  width: 6rem;
+  text-align: right;
+  font-weight: ${({ theme }) => theme.weight.semibold};
+  margin: 0;
+`;
+
+const TotalBar = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--border);
+  border-radius: ${({ theme }) => theme.radius.lg};
+  padding: ${({ theme }) => theme.space[4]};
+  margin-top: ${({ theme }) => theme.space[6]};
+`;
+
+const TotalAmount = styled.span`
+  font-size: ${({ theme }) => theme.font.xl};
+  font-weight: ${({ theme }) => theme.weight.bold};
+`;
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function CartPage() {
   const { cartItems, updateQuantity, removeFromCart } = useCart();
@@ -31,32 +107,28 @@ export function CartPage() {
 
   if (cartItems.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-4 py-12">
-        <p className="text-lg text-gray-500">{t('cart.empty')}</p>
+      <EmptyState>
+        {t('cart.empty')}
         <Link to="/">
           <Button>{t('cart.continueShopping')}</Button>
         </Link>
-      </div>
+      </EmptyState>
     );
   }
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold">{t('cart.title')}</h1>
-      <div className="space-y-4">
+      <PageTitle style={{ marginBottom: '1.5rem' }}>{t('cart.title')}</PageTitle>
+      <ItemList>
         {cartItems.map((item) => (
           <Card key={item.productId}>
-            <CardContent className="flex items-center gap-4 p-4">
-              <img
-                src={item.imageUrl}
-                alt={item.name}
-                className="h-20 w-20 rounded object-cover"
-              />
-              <div className="flex-1">
-                <h3 className="font-semibold">{item.name}</h3>
-                <p className="text-gray-600">${item.price.toFixed(2)}</p>
-              </div>
-              <div className="flex items-center gap-2">
+            <ItemContent>
+              <ItemImage src={item.imageUrl} alt={item.name} />
+              <ItemInfo>
+                <ItemName>{item.name}</ItemName>
+                <ItemPrice>${item.price.toFixed(2)}</ItemPrice>
+              </ItemInfo>
+              <QuantityControls>
                 <Button
                   variant="outline"
                   size="sm"
@@ -64,7 +136,7 @@ export function CartPage() {
                 >
                   -
                 </Button>
-                <span className="w-8 text-center">{item.quantity}</span>
+                <QuantityDisplay>{item.quantity}</QuantityDisplay>
                 <Button
                   variant="outline"
                   size="sm"
@@ -72,28 +144,22 @@ export function CartPage() {
                 >
                   +
                 </Button>
-              </div>
-              <p className="w-24 text-right font-semibold">
-                ${(item.price * item.quantity).toFixed(2)}
-              </p>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => handleRemove(item.productId)}
-              >
+              </QuantityControls>
+              <ItemSubtotal>${(item.price * item.quantity).toFixed(2)}</ItemSubtotal>
+              <Button variant="destructive" size="sm" onClick={() => handleRemove(item.productId)}>
                 {t('cart.remove')}
               </Button>
-            </CardContent>
+            </ItemContent>
           </Card>
         ))}
-      </div>
+      </ItemList>
 
-      <div className="mt-6 flex items-center justify-between rounded-lg border p-4">
-        <span className="text-xl font-bold">{t('cart.total', { amount: total.toFixed(2) })}</span>
+      <TotalBar>
+        <TotalAmount>{t('cart.total', { amount: total.toFixed(2) })}</TotalAmount>
         <Button size="lg" onClick={() => navigate('/checkout')}>
           {t('cart.checkout')}
         </Button>
-      </div>
+      </TotalBar>
     </div>
   );
 }

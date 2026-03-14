@@ -1,14 +1,56 @@
+import styled from 'styled-components';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useOrders } from '@/lib/queries';
 import { Card, CardContent } from '@/components/ui/card';
+import { PageTitle, StatusBadge, EmptyState, SkeletonBox } from '@/styles/shared';
 
-const statusColors: Record<string, string> = {
-  Pending: 'bg-yellow-100 text-yellow-800',
-  Processing: 'bg-blue-100 text-blue-800',
-  OutForDelivery: 'bg-purple-100 text-purple-800',
-  Delivered: 'bg-green-100 text-green-800',
-};
+// ─── Styled components ────────────────────────────────────────────────────────
+
+const OrderList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space[4]};
+`;
+
+const OrderCardLink = styled(Link)`
+  display: block;
+  text-decoration: none;
+`;
+
+const OrderCardContent = styled(CardContent)`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: ${({ theme }) => theme.space[4]};
+`;
+
+const OrderInfo = styled.div``;
+
+const OrderNumber = styled.p`
+  font-weight: ${({ theme }) => theme.weight.semibold};
+  margin: 0 0 ${({ theme }) => theme.space[1]};
+`;
+
+const OrderDate = styled.p`
+  font-size: ${({ theme }) => theme.font.sm};
+  color: ${({ theme }) => theme.color.gray500};
+  margin: 0;
+`;
+
+const OrderAmount = styled.p`
+  font-weight: ${({ theme }) => theme.weight.semibold};
+  margin: 0;
+`;
+
+const SkeletonRow = styled(CardContent)`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: ${({ theme }) => theme.space[4]};
+`;
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function OrdersPage() {
   const { data: orders = [], isLoading } = useOrders();
@@ -16,56 +58,54 @@ export function OrdersPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
+      <OrderList>
         {Array.from({ length: 3 }).map((_, i) => (
-          <Card key={i} className="animate-pulse">
-            <CardContent className="flex items-center justify-between p-4">
-              <div className="h-5 w-24 rounded bg-gray-200" />
-              <div className="h-5 w-20 rounded bg-gray-200" />
-              <div className="h-5 w-16 rounded bg-gray-200" />
-            </CardContent>
+          <Card key={i}>
+            <SkeletonRow>
+              <SkeletonBox $h="1.25rem" $w="6rem" />
+              <SkeletonBox $h="1.25rem" $w="5rem" />
+              <SkeletonBox $h="1.25rem" $w="4rem" />
+            </SkeletonRow>
           </Card>
         ))}
-      </div>
+      </OrderList>
     );
   }
 
   if (orders.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-4 py-12">
-        <p className="text-lg text-gray-500">{t('orders.empty')}</p>
-        <Link to="/" className="text-blue-600 hover:underline">
+      <EmptyState>
+        {t('orders.empty')}
+        <Link to="/" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>
           {t('orders.startShopping')}
         </Link>
-      </div>
+      </EmptyState>
     );
   }
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold">{t('orders.title')}</h1>
-      <div className="space-y-4">
+      <PageTitle style={{ marginBottom: '1.5rem' }}>{t('orders.title')}</PageTitle>
+      <OrderList>
         {orders.map((order, index) => (
-          <Link key={order.id} to={`/orders/${order.id}`}>
-            <Card className="transition-shadow hover:shadow-md">
-              <CardContent className="flex items-center justify-between p-4">
-                <div>
-                  <p className="font-semibold">{t('orders.orderNumber', { number: orders.length - index })}</p>
-                  <p className="text-sm text-gray-500">
-                    {new Date(order.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-                <p className="font-semibold">${Number(order.totalAmount).toFixed(2)}</p>
-                <span
-                  className={`rounded-full px-3 py-1 text-xs font-medium ${statusColors[order.status] || 'bg-gray-100 text-gray-800'}`}
-                >
+          <OrderCardLink key={order.id} to={`/orders/${order.id}`}>
+            <Card>
+              <OrderCardContent>
+                <OrderInfo>
+                  <OrderNumber>
+                    {t('orders.orderNumber', { number: orders.length - index })}
+                  </OrderNumber>
+                  <OrderDate>{new Date(order.createdAt).toLocaleDateString()}</OrderDate>
+                </OrderInfo>
+                <OrderAmount>${Number(order.totalAmount).toFixed(2)}</OrderAmount>
+                <StatusBadge status={order.status}>
                   {t(`status.${order.status}`, order.status)}
-                </span>
-              </CardContent>
+                </StatusBadge>
+              </OrderCardContent>
             </Card>
-          </Link>
+          </OrderCardLink>
         ))}
-      </div>
+      </OrderList>
     </div>
   );
 }

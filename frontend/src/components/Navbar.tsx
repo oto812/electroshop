@@ -1,3 +1,4 @@
+import styled from 'styled-components';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
@@ -5,47 +6,121 @@ import { useCart } from '@/context/CartContext';
 import { Button } from '@/components/ui/button';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
+// ─── Styled components ────────────────────────────────────────────────────────
+
+const Nav = styled.nav`
+  border-bottom: 1px solid var(--border);
+  background-color: var(--background);
+`;
+
+const NavInner = styled.div`
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: 0 ${({ theme }) => theme.space[4]};
+
+  @media (min-width: ${({ theme }) => theme.breakpoint.sm}) {
+    padding: 0 ${({ theme }) => theme.space[6]};
+  }
+
+  @media (min-width: ${({ theme }) => theme.breakpoint.lg}) {
+    padding: 0 ${({ theme }) => theme.space[8]};
+  }
+`;
+
+const NavRow = styled.div`
+  display: flex;
+  height: ${({ theme }) => theme.space[16]};
+  align-items: center;
+  justify-content: space-between;
+`;
+
+const NavLeft = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space[6]};
+`;
+
+const Brand = styled(Link)`
+  font-size: ${({ theme }) => theme.font.xl};
+  font-weight: ${({ theme }) => theme.weight.bold};
+  color: var(--foreground);
+  text-decoration: none;
+`;
+
+const NavLink = styled(Link)`
+  font-size: ${({ theme }) => theme.font.sm};
+  color: ${({ theme }) => theme.color.gray600};
+  text-decoration: none;
+  transition: color 0.15s;
+
+  &:hover {
+    color: ${({ theme }) => theme.color.gray800};
+  }
+`;
+
+const CartLinkWrapper = styled.div`
+  position: relative;
+  display: inline-flex;
+`;
+
+const CartBadge = styled.span`
+  position: absolute;
+  right: -1rem;
+  top: -0.5rem;
+  display: flex;
+  height: 1.25rem;
+  width: 1.25rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: ${({ theme }) => theme.radius.full};
+  background-color: ${({ theme }) => theme.color.red500};
+  font-size: 0.75rem;
+  color: ${({ theme }) => theme.color.white};
+  line-height: 1;
+`;
+
+const NavRight = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space[2]};
+`;
+
+const UserEmail = styled.span`
+  font-size: ${({ theme }) => theme.font.sm};
+  color: ${({ theme }) => theme.color.gray600};
+`;
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export function Navbar() {
   const { isAuthenticated, user, logout } = useAuth();
   const { cartCount } = useCart();
   const { t } = useTranslation();
 
   return (
-    <nav className="border-b bg-white">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between">
-          <div className="flex items-center gap-6">
-            <Link to="/" className="text-xl font-bold">
-              ElectroShop
-            </Link>
-            <Link to="/" className="text-sm text-gray-600 hover:text-gray-900">
-              {t('nav.home')}
-            </Link>
-            <Link to="/cart" className="relative text-sm text-gray-600 hover:text-gray-900">
-              {t('nav.cart')}
-              {cartCount > 0 && (
-                <span className="absolute -right-4 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">
-                  {cartCount}
-                </span>
-              )}
-            </Link>
+    <Nav>
+      <NavInner>
+        <NavRow>
+          <NavLeft>
+            <Brand to="/">ElectroShop</Brand>
+            <NavLink to="/">{t('nav.home')}</NavLink>
+            <CartLinkWrapper>
+              <NavLink to="/cart">{t('nav.cart')}</NavLink>
+              {cartCount > 0 && <CartBadge>{cartCount}</CartBadge>}
+            </CartLinkWrapper>
             {isAuthenticated && (
-              <Link to="/orders" className="text-sm text-gray-600 hover:text-gray-900">
-                {t('nav.myOrders')}
-              </Link>
+              <NavLink to="/orders">{t('nav.myOrders')}</NavLink>
             )}
             {user?.isAdmin && (
-              <Link to="/admin" className="text-sm text-gray-600 hover:text-gray-900">
-                {t('nav.admin')}
-              </Link>
+              <NavLink to="/admin">{t('nav.admin')}</NavLink>
             )}
-          </div>
+          </NavLeft>
 
-          <div className="flex items-center gap-2">
+          <NavRight>
             <LanguageSwitcher />
             {isAuthenticated ? (
               <>
-                <span className="text-sm text-gray-600">{user?.email}</span>
+                <UserEmail>{user?.email}</UserEmail>
                 <Button variant="outline" size="sm" onClick={logout}>
                   {t('nav.logout')}
                 </Button>
@@ -60,9 +135,9 @@ export function Navbar() {
                 </Link>
               </>
             )}
-          </div>
-        </div>
-      </div>
-    </nav>
+          </NavRight>
+        </NavRow>
+      </NavInner>
+    </Nav>
   );
 }

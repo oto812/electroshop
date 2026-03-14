@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import styled from "styled-components";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useOrderDetail, useUpdateOrderStatus, queryKeys } from "@/lib/queries";
@@ -16,8 +17,135 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  NarrowContainer,
+  StatusBadge,
+  DataTable,
+  TableHead,
+  Th,
+  ThRight,
+  Td,
+  TdRight,
+  SkeletonBox,
+  EmptyState,
+} from "@/styles/shared";
 import { toast } from "sonner";
 import { Socket } from "socket.io-client";
+
+// ─── Styled components ────────────────────────────────────────────────────────
+
+const OrderHeading = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: ${({ theme }) => theme.space[6]};
+`;
+
+const OrderTitle = styled.h1`
+  font-size: ${({ theme }) => theme.font["2xl"]};
+  font-weight: ${({ theme }) => theme.weight.bold};
+  margin: 0;
+`;
+
+const DetailRow = styled.p`
+  margin: 0 0 ${({ theme }) => theme.space[2]};
+  &:last-child { margin-bottom: 0; }
+`;
+
+const DetailLabel = styled.span`
+  font-weight: ${({ theme }) => theme.weight.medium};
+`;
+
+const TotalFooter = styled.tfoot``;
+
+const TotalCell = styled.td`
+  padding-top: ${({ theme }) => theme.space[3]};
+  font-weight: ${({ theme }) => theme.weight.bold};
+  text-align: right;
+`;
+
+const TotalCellLabel = styled.td`
+  padding-top: ${({ theme }) => theme.space[3]};
+  font-weight: ${({ theme }) => theme.weight.bold};
+  text-align: right;
+`;
+
+const ChatCardHeader = styled(CardHeader)`
+  cursor: pointer;
+`;
+
+const ChatHeaderRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+`;
+
+const ChatToggle = styled.span`
+  font-size: ${({ theme }) => theme.font.sm};
+  font-weight: ${({ theme }) => theme.weight.normal};
+  color: ${({ theme }) => theme.color.gray500};
+`;
+
+const ChatMessages = styled.div`
+  height: 16rem;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: ${({ theme }) => theme.radius.md};
+  background-color: #f9fafb;
+  padding: ${({ theme }) => theme.space[3]};
+  margin-bottom: ${({ theme }) => theme.space[4]};
+`;
+
+const EmptyChat = styled.p`
+  text-align: center;
+  font-size: ${({ theme }) => theme.font.sm};
+  color: ${({ theme }) => theme.color.gray500};
+`;
+
+const MessageRow = styled.div<{ $isAdmin: boolean }>`
+  display: flex;
+  justify-content: ${({ $isAdmin }) => ($isAdmin ? "flex-end" : "flex-start")};
+  margin-bottom: ${({ theme }) => theme.space[2]};
+`;
+
+const MessageBubble = styled.div<{ $isAdmin: boolean }>`
+  max-width: 20rem;
+  border-radius: ${({ theme }) => theme.radius.lg};
+  padding: ${({ theme }) => `${theme.space[2]} ${theme.space[3]}`};
+  font-size: ${({ theme }) => theme.font.sm};
+  background-color: ${({ $isAdmin }) => ($isAdmin ? "#3b82f6" : "#e5e7eb")};
+  color: ${({ $isAdmin }) => ($isAdmin ? "#ffffff" : "#1f2937")};
+`;
+
+const SenderLabel = styled.p`
+  font-size: 0.7rem;
+  font-weight: ${({ theme }) => theme.weight.medium};
+  margin: 0 0 ${({ theme }) => theme.space[1]};
+`;
+
+const MessageTime = styled.p<{ $isAdmin: boolean }>`
+  margin: ${({ theme }) => `${theme.space[1]} 0 0`};
+  font-size: 0.7rem;
+  color: ${({ $isAdmin }) => ($isAdmin ? "rgba(255,255,255,0.7)" : "#6b7280")};
+`;
+
+const ChatInputRow = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.space[2]};
+`;
+
+const SpacedCard = styled(Card)`
+  margin-bottom: ${({ theme }) => theme.space[6]};
+`;
+
+const SkeletonWrapper = styled.div`
+  padding-top: ${({ theme }) => theme.space[8]};
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space[4]};
+`;
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ChatMessage {
   orderId: number;
@@ -27,12 +155,8 @@ interface ChatMessage {
 }
 
 const statuses = ["Pending", "Processing", "OutForDelivery", "Delivered"];
-const statusColors: Record<string, string> = {
-  Pending: "bg-yellow-100 text-yellow-800",
-  Processing: "bg-blue-100 text-blue-800",
-  OutForDelivery: "bg-purple-100 text-purple-800",
-  Delivered: "bg-green-100 text-green-800",
-};
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function AdminOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -51,15 +175,11 @@ export function AdminOrderDetailPage() {
     const socket = createSocket();
     socketRef.current = socket;
 
-    socket.on("chatHistory", (history: ChatMessage[]) => {
-      setMessages(history);
-    });
+    socket.on("chatHistory", (history: ChatMessage[]) => setMessages(history));
 
     socket.on("chatMessage", (msg: ChatMessage) => {
       setMessages((prev) => {
-        if (prev.some((m) => m.timestamp === msg.timestamp && m.message === msg.message)) {
-          return prev;
-        }
+        if (prev.some((m) => m.timestamp === msg.timestamp && m.message === msg.message)) return prev;
         return [...prev, msg];
       });
     });
@@ -70,15 +190,10 @@ export function AdminOrderDetailPage() {
       );
     });
 
-    socket.on("connect", () => {
-      socket.emit("joinOrderRoom", { orderId: Number(id) });
-    });
-
+    socket.on("connect", () => socket.emit("joinOrderRoom", { orderId: Number(id) }));
     socket.connect();
 
-    return () => {
-      socket.disconnect();
-    };
+    return () => socket.disconnect();
   }, [id, queryClient]);
 
   useEffect(() => {
@@ -91,41 +206,34 @@ export function AdminOrderDetailPage() {
     );
     try {
       await updateStatus.mutateAsync({ id: Number(id), status: newStatus });
-      toast.success(t('adminOrderDetail.statusUpdated', { status: t(`status.${newStatus}`) }));
+      toast.success(t("adminOrderDetail.statusUpdated", { status: t(`status.${newStatus}`) }));
     } catch {
       queryClient.invalidateQueries({ queryKey: queryKeys.order(id) });
-      toast.error(t('adminOrderDetail.statusError'));
+      toast.error(t("adminOrderDetail.statusError"));
     }
   };
 
   const sendMessage = () => {
     if (!messageInput.trim() || !socketRef.current) return;
-    socketRef.current.emit("sendChatMessage", {
-      orderId: Number(id),
-      message: messageInput.trim(),
-      senderRole: "admin",
-    });
+    socketRef.current.emit("sendChatMessage", { orderId: Number(id), message: messageInput.trim(), senderRole: "admin" });
     setMessageInput("");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   };
 
   if (isLoading) {
     return (
-      <div className="animate-pulse space-y-4 py-8">
-        <div className="h-8 w-48 rounded bg-gray-200" />
-        <div className="h-40 rounded bg-gray-200" />
-      </div>
+      <SkeletonWrapper>
+        <SkeletonBox $h="2rem" $w="10rem" />
+        <SkeletonBox $h="10rem" />
+      </SkeletonWrapper>
     );
   }
 
   if (!order) {
-    return <div className="py-12 text-center text-gray-500">{t('adminOrderDetail.notFound')}</div>;
+    return <EmptyState>{t("adminOrderDetail.notFound")}</EmptyState>;
   }
 
   const hasValidRouteCoordinates =
@@ -135,9 +243,9 @@ export function AdminOrderDetailPage() {
     order.deliveryLongitude !== 0;
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{t('adminOrderDetail.heading', { id: order.id })}</h1>
+    <NarrowContainer $maxWidth="48rem">
+      <OrderHeading>
+        <OrderTitle>{t("adminOrderDetail.heading", { id: order.id })}</OrderTitle>
         <Select value={order.status} onValueChange={handleStatusChange}>
           <SelectTrigger className="w-44">
             <SelectValue />
@@ -145,41 +253,35 @@ export function AdminOrderDetailPage() {
           <SelectContent>
             {statuses.map((s) => (
               <SelectItem key={s} value={s}>
-                <span className={`rounded-full px-2 py-0.5 text-xs ${statusColors[s]}`}>
-                  {t(`status.${s}`)}
-                </span>
+                <StatusBadge status={s}>{t(`status.${s}`)}</StatusBadge>
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </OrderHeading>
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>{t('adminOrderDetail.details')}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
+      <SpacedCard>
+        <CardHeader><CardTitle>{t("adminOrderDetail.details")}</CardTitle></CardHeader>
+        <CardContent>
           {order.user && (
-            <p>
-              <span className="font-medium">{t('adminOrderDetail.customerLabel')}</span> {order.user.email}
-            </p>
+            <DetailRow>
+              <DetailLabel>{t("adminOrderDetail.customerLabel")}</DetailLabel>{" "}{order.user.email}
+            </DetailRow>
           )}
-          <p>
-            <span className="font-medium">{t('adminOrderDetail.dateLabel')}</span>{" "}
+          <DetailRow>
+            <DetailLabel>{t("adminOrderDetail.dateLabel")}</DetailLabel>{" "}
             {new Date(order.createdAt).toLocaleString()}
-          </p>
-          <p>
-            <span className="font-medium">{t('adminOrderDetail.addressLabel')}</span>{" "}
+          </DetailRow>
+          <DetailRow>
+            <DetailLabel>{t("adminOrderDetail.addressLabel")}</DetailLabel>{" "}
             {order.deliveryAddress}
-          </p>
+          </DetailRow>
         </CardContent>
-      </Card>
+      </SpacedCard>
 
       {hasValidRouteCoordinates && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>{t('adminOrderDetail.route')}</CardTitle>
-          </CardHeader>
+        <SpacedCard>
+          <CardHeader><CardTitle>{t("adminOrderDetail.route")}</CardTitle></CardHeader>
           <CardContent>
             <OrderRouteMap
               deliveryLatitude={order.deliveryLatitude!}
@@ -187,87 +289,76 @@ export function AdminOrderDetailPage() {
               deliveryAddress={order.deliveryAddress}
             />
           </CardContent>
-        </Card>
+        </SpacedCard>
       )}
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>{t('adminOrderDetail.items')}</CardTitle>
-        </CardHeader>
+      <SpacedCard>
+        <CardHeader><CardTitle>{t("adminOrderDetail.items")}</CardTitle></CardHeader>
         <CardContent>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left">
-                <th className="pb-2">{t('adminOrderDetail.product')}</th>
-                <th className="pb-2">{t('adminOrderDetail.qty')}</th>
-                <th className="pb-2 text-right">{t('adminOrderDetail.price')}</th>
-                <th className="pb-2 text-right">{t('adminOrderDetail.subtotal')}</th>
+          <DataTable>
+            <TableHead>
+              <tr>
+                <Th>{t("adminOrderDetail.product")}</Th>
+                <Th>{t("adminOrderDetail.qty")}</Th>
+                <ThRight>{t("adminOrderDetail.price")}</ThRight>
+                <ThRight>{t("adminOrderDetail.subtotal")}</ThRight>
               </tr>
-            </thead>
+            </TableHead>
             <tbody>
               {order.orderItems.map((item) => (
-                <tr key={item.id} className="border-b last:border-0">
-                  <td className="py-2">{item.product.name}</td>
-                  <td className="py-2">{item.quantity}</td>
-                  <td className="py-2 text-right">${item.priceAtOrder.toFixed(2)}</td>
-                  <td className="py-2 text-right">${(item.priceAtOrder * item.quantity).toFixed(2)}</td>
+                <tr key={item.id}>
+                  <Td>{item.product.name}</Td>
+                  <Td>{item.quantity}</Td>
+                  <TdRight>${item.priceAtOrder.toFixed(2)}</TdRight>
+                  <TdRight>${(item.priceAtOrder * item.quantity).toFixed(2)}</TdRight>
                 </tr>
               ))}
             </tbody>
-            <tfoot>
+            <TotalFooter>
               <tr>
-                <td colSpan={3} className="pt-3 text-right font-bold">{t('adminOrderDetail.total')}</td>
-                <td className="pt-3 text-right font-bold">${order.totalAmount.toFixed(2)}</td>
+                <TotalCellLabel colSpan={3}>{t("adminOrderDetail.total")}</TotalCellLabel>
+                <TotalCell>${order.totalAmount.toFixed(2)}</TotalCell>
               </tr>
-            </tfoot>
-          </table>
+            </TotalFooter>
+          </DataTable>
         </CardContent>
-      </Card>
+      </SpacedCard>
 
       <Card>
-        <CardHeader className="cursor-pointer" onClick={() => setChatOpen(!chatOpen)}>
-          <CardTitle className="flex items-center justify-between">
-            {t('adminOrderDetail.chat')}
-            <span className="text-sm font-normal text-gray-500">
-              {chatOpen ? t('adminOrderDetail.collapse') : t('adminOrderDetail.expand')}
-            </span>
+        <ChatCardHeader onClick={() => setChatOpen(!chatOpen)}>
+          <CardTitle>
+            <ChatHeaderRow>
+              {t("adminOrderDetail.chat")}
+              <ChatToggle>{chatOpen ? t("adminOrderDetail.collapse") : t("adminOrderDetail.expand")}</ChatToggle>
+            </ChatHeaderRow>
           </CardTitle>
-        </CardHeader>
+        </ChatCardHeader>
         {chatOpen && (
           <CardContent>
-            <div className="mb-4 h-64 overflow-y-auto rounded border bg-gray-50 p-3">
-              {messages.length === 0 && (
-                <p className="text-center text-sm text-gray-400">{t('adminOrderDetail.noMessages')}</p>
-              )}
+            <ChatMessages>
+              {messages.length === 0 && <EmptyChat>{t("adminOrderDetail.noMessages")}</EmptyChat>}
               {messages.map((msg, i) => (
-                <div key={i} className={`mb-2 flex ${msg.senderRole === "admin" ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-xs rounded-lg px-3 py-2 text-sm ${msg.senderRole === "admin" ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-800"}`}>
-                    <p className="text-xs font-medium mb-1">
-                      {msg.senderRole === "admin" ? t('adminOrderDetail.you') : t('adminOrderDetail.customer')}
-                    </p>
-                    <p>{msg.message}</p>
-                    <p className={`mt-1 text-xs ${msg.senderRole === "admin" ? "text-blue-100" : "text-gray-500"}`}>
+                <MessageRow key={i} $isAdmin={msg.senderRole === "admin"}>
+                  <MessageBubble $isAdmin={msg.senderRole === "admin"}>
+                    <SenderLabel>
+                      {msg.senderRole === "admin" ? t("adminOrderDetail.you") : t("adminOrderDetail.customer")}
+                    </SenderLabel>
+                    <p style={{ margin: 0 }}>{msg.message}</p>
+                    <MessageTime $isAdmin={msg.senderRole === "admin"}>
                       {new Date(msg.timestamp).toLocaleTimeString()}
-                    </p>
-                  </div>
-                </div>
+                    </MessageTime>
+                  </MessageBubble>
+                </MessageRow>
               ))}
               <div ref={chatEndRef} />
-            </div>
-            <div className="flex gap-2">
-              <Input
-                value={messageInput}
-                onChange={(e) => setMessageInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={t('adminOrderDetail.messagePlaceholder')}
-              />
-              <Button onClick={sendMessage} disabled={!messageInput.trim()}>
-                {t('adminOrderDetail.send')}
-              </Button>
-            </div>
+            </ChatMessages>
+            <ChatInputRow>
+              <Input value={messageInput} onChange={(e) => setMessageInput(e.target.value)} onKeyDown={handleKeyDown} placeholder={t("adminOrderDetail.messagePlaceholder")} />
+              <Button onClick={sendMessage} disabled={!messageInput.trim()}>{t("adminOrderDetail.send")}</Button>
+            </ChatInputRow>
           </CardContent>
         )}
       </Card>
-    </div>
+    </NarrowContainer>
   );
 }

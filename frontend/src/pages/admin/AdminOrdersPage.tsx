@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import styled from 'styled-components';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAdminOrders, useUpdateOrderStatus, queryKeys } from '@/lib/queries';
@@ -14,17 +15,47 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { OrderMap } from '@/components/admin/OrderMap';
+import {
+  PageHeader,
+  PageTitle,
+  StatusBadge,
+  DataTable,
+  TableHead,
+  Th,
+  Td,
+  EmptyState,
+  SkeletonBox,
+} from '@/styles/shared';
 import { toast } from 'sonner';
 import { Socket } from 'socket.io-client';
 
+// ─── Styled components ────────────────────────────────────────────────────────
+
+const MapSection = styled.div`
+  margin-bottom: ${({ theme }) => theme.space[6]};
+`;
+
+const OrderLink = styled(Link)`
+  font-weight: ${({ theme }) => theme.weight.medium};
+  color: ${({ theme }) => theme.color.blue600};
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+`;
+
+const SkeletonWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space[4]};
+`;
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
 const statuses = ['Pending', 'Processing', 'OutForDelivery', 'Delivered'];
 
-const statusColors: Record<string, string> = {
-  Pending: 'bg-yellow-100 text-yellow-800',
-  Processing: 'bg-blue-100 text-blue-800',
-  OutForDelivery: 'bg-purple-100 text-purple-800',
-  Delivered: 'bg-green-100 text-green-800',
-};
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function AdminOrdersPage() {
   const queryClient = useQueryClient();
@@ -37,12 +68,9 @@ export function AdminOrdersPage() {
   useEffect(() => {
     const socket = createSocket();
     socketRef.current = socket;
-
     socket.connect();
 
-    socket.on('connect', () => {
-      socket.emit('joinAdminDashboard');
-    });
+    socket.on('connect', () => socket.emit('joinAdminDashboard'));
 
     socket.on('newOrder', (order: any) => {
       queryClient.setQueryData(queryKeys.adminOrders, (old: any[] | undefined) =>
@@ -51,16 +79,13 @@ export function AdminOrdersPage() {
       toast.info(t('adminOrders.newOrder', { id: order.id }));
     });
 
-    return () => {
-      socket.disconnect();
-    };
+    return () => socket.disconnect();
   }, [queryClient, t]);
 
   const handleStatusChange = async (orderId: number, newStatus: string) => {
     queryClient.setQueryData(queryKeys.adminOrders, (old: any[] | undefined) =>
       old ? old.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)) : old
     );
-
     try {
       await updateStatus.mutateAsync({ id: orderId, status: newStatus });
       toast.success(t('adminOrders.statusUpdated', { id: orderId, status: t(`status.${newStatus}`) }));
@@ -72,56 +97,54 @@ export function AdminOrdersPage() {
 
   if (isLoading) {
     return (
-      <div className="animate-pulse space-y-4">
-        <div className="h-8 w-48 rounded bg-gray-200" />
-        <div className="h-64 rounded bg-gray-200" />
-      </div>
+      <SkeletonWrapper>
+        <SkeletonBox $h="2rem" $w="10rem" />
+        <SkeletonBox $h="16rem" />
+      </SkeletonWrapper>
     );
   }
 
   if (orders.length === 0) {
-    return <div className="py-12 text-center text-gray-500">{t('adminOrders.empty')}</div>;
+    return <EmptyState>{t('adminOrders.empty')}</EmptyState>;
   }
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{t('adminOrders.title')}</h1>
+      <PageHeader>
+        <PageTitle>{t('adminOrders.title')}</PageTitle>
         <Button variant="outline" size="sm" onClick={() => setMapVisible(!mapVisible)}>
           {mapVisible ? t('adminOrders.hideMap') : t('adminOrders.showMap')}
         </Button>
-      </div>
+      </PageHeader>
 
       {mapVisible && (
-        <div className="mb-6">
+        <MapSection>
           <OrderMap orders={orders} />
-        </div>
+        </MapSection>
       )}
 
       <Card>
-        <CardContent className="p-0">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-gray-50 text-left">
-                <th className="px-4 py-3">{t('adminOrders.colOrderId')}</th>
-                <th className="px-4 py-3">{t('adminOrders.colCustomer')}</th>
-                <th className="px-4 py-3">{t('adminOrders.colDate')}</th>
-                <th className="px-4 py-3">{t('adminOrders.colTotal')}</th>
-                <th className="px-4 py-3">{t('adminOrders.colStatus')}</th>
+        <CardContent style={{ padding: 0 }}>
+          <DataTable>
+            <TableHead>
+              <tr>
+                <Th>{t('adminOrders.colOrderId')}</Th>
+                <Th>{t('adminOrders.colCustomer')}</Th>
+                <Th>{t('adminOrders.colDate')}</Th>
+                <Th>{t('adminOrders.colTotal')}</Th>
+                <Th>{t('adminOrders.colStatus')}</Th>
               </tr>
-            </thead>
+            </TableHead>
             <tbody>
               {orders.map((order) => (
-                <tr key={order.id} className="border-b last:border-0">
-                  <td className="px-4 py-3">
-                    <Link to={`/admin/orders/${order.id}`} className="font-medium text-blue-600 hover:underline">
-                      #{order.id}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3">{order.user?.email}</td>
-                  <td className="px-4 py-3">{new Date(order.createdAt).toLocaleDateString()}</td>
-                  <td className="px-4 py-3">${Number(order.totalAmount).toFixed(2)}</td>
-                  <td className="px-4 py-3">
+                <tr key={order.id}>
+                  <Td>
+                    <OrderLink to={`/admin/orders/${order.id}`}>#{order.id}</OrderLink>
+                  </Td>
+                  <Td>{order.user?.email}</Td>
+                  <Td>{new Date(order.createdAt).toLocaleDateString()}</Td>
+                  <Td>${Number(order.totalAmount).toFixed(2)}</Td>
+                  <Td>
                     <Select value={order.status} onValueChange={(value) => handleStatusChange(order.id, value)}>
                       <SelectTrigger className="w-40">
                         <SelectValue />
@@ -129,18 +152,16 @@ export function AdminOrdersPage() {
                       <SelectContent>
                         {statuses.map((s) => (
                           <SelectItem key={s} value={s}>
-                            <span className={`rounded-full px-2 py-0.5 text-xs ${statusColors[s]}`}>
-                              {t(`status.${s}`)}
-                            </span>
+                            <StatusBadge status={s}>{t(`status.${s}`)}</StatusBadge>
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                  </td>
+                  </Td>
                 </tr>
               ))}
             </tbody>
-          </table>
+          </DataTable>
         </CardContent>
       </Card>
     </div>
