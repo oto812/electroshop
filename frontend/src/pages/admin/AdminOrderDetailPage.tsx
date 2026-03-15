@@ -49,7 +49,9 @@ const OrderTitle = styled.h1`
 
 const DetailRow = styled.p`
   margin: 0 0 ${({ theme }) => theme.space[2]};
-  &:last-child { margin-bottom: 0; }
+  &:last-child {
+    margin-bottom: 0;
+  }
 `;
 
 const DetailLabel = styled.span`
@@ -179,21 +181,33 @@ export function AdminOrderDetailPage() {
 
     socket.on("chatMessage", (msg: ChatMessage) => {
       setMessages((prev) => {
-        if (prev.some((m) => m.timestamp === msg.timestamp && m.message === msg.message)) return prev;
+        if (
+          prev.some(
+            (m) => m.timestamp === msg.timestamp && m.message === msg.message,
+          )
+        )
+          return prev;
         return [...prev, msg];
       });
     });
 
-    socket.on("orderStatusUpdate", (data: { orderId: number; status: string }) => {
-      queryClient.setQueryData(queryKeys.order(id), (old: any) =>
-        old ? { ...old, status: data.status } : old
-      );
-    });
+    socket.on(
+      "orderStatusUpdate",
+      (data: { orderId: number; status: string }) => {
+        queryClient.setQueryData(queryKeys.order(id), (old: any) =>
+          old ? { ...old, status: data.status } : old,
+        );
+      },
+    );
 
-    socket.on("connect", () => socket.emit("joinOrderRoom", { orderId: Number(id) }));
+    socket.on("connect", () =>
+      socket.emit("joinOrderRoom", { orderId: Number(id) }),
+    );
     socket.connect();
 
-    return () => socket.disconnect();
+    return () => {
+      socket.disconnect();
+    };
   }, [id, queryClient]);
 
   useEffect(() => {
@@ -202,11 +216,15 @@ export function AdminOrderDetailPage() {
 
   const handleStatusChange = async (newStatus: string) => {
     queryClient.setQueryData(queryKeys.order(id), (old: any) =>
-      old ? { ...old, status: newStatus } : old
+      old ? { ...old, status: newStatus } : old,
     );
     try {
       await updateStatus.mutateAsync({ id: Number(id), status: newStatus });
-      toast.success(t("adminOrderDetail.statusUpdated", { status: t(`status.${newStatus}`) }));
+      toast.success(
+        t("adminOrderDetail.statusUpdated", {
+          status: t(`status.${newStatus}`),
+        }),
+      );
     } catch {
       queryClient.invalidateQueries({ queryKey: queryKeys.order(id) });
       toast.error(t("adminOrderDetail.statusError"));
@@ -215,12 +233,19 @@ export function AdminOrderDetailPage() {
 
   const sendMessage = () => {
     if (!messageInput.trim() || !socketRef.current) return;
-    socketRef.current.emit("sendChatMessage", { orderId: Number(id), message: messageInput.trim(), senderRole: "admin" });
+    socketRef.current.emit("sendChatMessage", {
+      orderId: Number(id),
+      message: messageInput.trim(),
+      senderRole: "admin",
+    });
     setMessageInput("");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
   };
 
   if (isLoading) {
@@ -245,7 +270,9 @@ export function AdminOrderDetailPage() {
   return (
     <NarrowContainer $maxWidth="48rem">
       <OrderHeading>
-        <OrderTitle>{t("adminOrderDetail.heading", { id: order.id })}</OrderTitle>
+        <OrderTitle>
+          {t("adminOrderDetail.heading", { id: order.id })}
+        </OrderTitle>
         <Select value={order.status} onValueChange={handleStatusChange}>
           <SelectTrigger className="w-44">
             <SelectValue />
@@ -261,11 +288,14 @@ export function AdminOrderDetailPage() {
       </OrderHeading>
 
       <SpacedCard>
-        <CardHeader><CardTitle>{t("adminOrderDetail.details")}</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>{t("adminOrderDetail.details")}</CardTitle>
+        </CardHeader>
         <CardContent>
           {order.user && (
             <DetailRow>
-              <DetailLabel>{t("adminOrderDetail.customerLabel")}</DetailLabel>{" "}{order.user.email}
+              <DetailLabel>{t("adminOrderDetail.customerLabel")}</DetailLabel>{" "}
+              {order.user.email}
             </DetailRow>
           )}
           <DetailRow>
@@ -281,7 +311,9 @@ export function AdminOrderDetailPage() {
 
       {hasValidRouteCoordinates && (
         <SpacedCard>
-          <CardHeader><CardTitle>{t("adminOrderDetail.route")}</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>{t("adminOrderDetail.route")}</CardTitle>
+          </CardHeader>
           <CardContent>
             <OrderRouteMap
               deliveryLatitude={order.deliveryLatitude!}
@@ -293,7 +325,9 @@ export function AdminOrderDetailPage() {
       )}
 
       <SpacedCard>
-        <CardHeader><CardTitle>{t("adminOrderDetail.items")}</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>{t("adminOrderDetail.items")}</CardTitle>
+        </CardHeader>
         <CardContent>
           <DataTable>
             <TableHead>
@@ -310,13 +344,17 @@ export function AdminOrderDetailPage() {
                   <Td>{item.product.name}</Td>
                   <Td>{item.quantity}</Td>
                   <TdRight>${item.priceAtOrder.toFixed(2)}</TdRight>
-                  <TdRight>${(item.priceAtOrder * item.quantity).toFixed(2)}</TdRight>
+                  <TdRight>
+                    ${(item.priceAtOrder * item.quantity).toFixed(2)}
+                  </TdRight>
                 </tr>
               ))}
             </tbody>
             <TotalFooter>
               <tr>
-                <TotalCellLabel colSpan={3}>{t("adminOrderDetail.total")}</TotalCellLabel>
+                <TotalCellLabel colSpan={3}>
+                  {t("adminOrderDetail.total")}
+                </TotalCellLabel>
                 <TotalCell>${order.totalAmount.toFixed(2)}</TotalCell>
               </tr>
             </TotalFooter>
@@ -329,19 +367,27 @@ export function AdminOrderDetailPage() {
           <CardTitle>
             <ChatHeaderRow>
               {t("adminOrderDetail.chat")}
-              <ChatToggle>{chatOpen ? t("adminOrderDetail.collapse") : t("adminOrderDetail.expand")}</ChatToggle>
+              <ChatToggle>
+                {chatOpen
+                  ? t("adminOrderDetail.collapse")
+                  : t("adminOrderDetail.expand")}
+              </ChatToggle>
             </ChatHeaderRow>
           </CardTitle>
         </ChatCardHeader>
         {chatOpen && (
           <CardContent>
             <ChatMessages>
-              {messages.length === 0 && <EmptyChat>{t("adminOrderDetail.noMessages")}</EmptyChat>}
+              {messages.length === 0 && (
+                <EmptyChat>{t("adminOrderDetail.noMessages")}</EmptyChat>
+              )}
               {messages.map((msg, i) => (
                 <MessageRow key={i} $isAdmin={msg.senderRole === "admin"}>
                   <MessageBubble $isAdmin={msg.senderRole === "admin"}>
                     <SenderLabel>
-                      {msg.senderRole === "admin" ? t("adminOrderDetail.you") : t("adminOrderDetail.customer")}
+                      {msg.senderRole === "admin"
+                        ? t("adminOrderDetail.you")
+                        : t("adminOrderDetail.customer")}
                     </SenderLabel>
                     <p style={{ margin: 0 }}>{msg.message}</p>
                     <MessageTime $isAdmin={msg.senderRole === "admin"}>
@@ -353,8 +399,15 @@ export function AdminOrderDetailPage() {
               <div ref={chatEndRef} />
             </ChatMessages>
             <ChatInputRow>
-              <Input value={messageInput} onChange={(e) => setMessageInput(e.target.value)} onKeyDown={handleKeyDown} placeholder={t("adminOrderDetail.messagePlaceholder")} />
-              <Button onClick={sendMessage} disabled={!messageInput.trim()}>{t("adminOrderDetail.send")}</Button>
+              <Input
+                value={messageInput}
+                onChange={(e) => setMessageInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={t("adminOrderDetail.messagePlaceholder")}
+              />
+              <Button onClick={sendMessage} disabled={!messageInput.trim()}>
+                {t("adminOrderDetail.send")}
+              </Button>
             </ChatInputRow>
           </CardContent>
         )}
