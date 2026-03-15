@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import styled from 'styled-components';
 import { useTranslation } from 'react-i18next';
 import { useAdminProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, type Product } from '@/lib/queries';
 import { Button } from '@/components/ui/button';
@@ -12,9 +13,59 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  PageHeader,
+  PageTitle,
+  DataTable,
+  TableHead,
+  Th,
+  ThRight,
+  Td,
+  TdRight,
+  SkeletonBox,
+} from '@/styles/shared';
 import { toast } from 'sonner';
 
+// ─── Styled components ────────────────────────────────────────────────────────
+
+const LowStock = styled.span`
+  color: #ef4444;
+  font-weight: ${({ theme }) => theme.weight.medium};
+`;
+
+const ActionCell = styled(TdRight)`
+  padding-right: ${({ theme }) => theme.space[4]};
+`;
+
+const ButtonGroup = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: ${({ theme }) => theme.space[2]};
+`;
+
+const FormGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: ${({ theme }) => theme.space[4]};
+`;
+
+const FieldGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space[2]};
+`;
+
+const SkeletonWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space[4]};
+`;
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
 const emptyForm = { name: '', description: '', imageUrl: '', price: 0, stockQuantity: 0 };
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function AdminProductsPage() {
   const { data: products = [], isLoading } = useAdminProducts();
@@ -37,13 +88,7 @@ export function AdminProductsPage() {
 
   const openEditDialog = (product: Product) => {
     setEditingProduct(product);
-    setForm({
-      name: product.name,
-      description: product.description,
-      imageUrl: product.imageUrl,
-      price: product.price,
-      stockQuantity: product.stockQuantity,
-    });
+    setForm({ name: product.name, description: product.description, imageUrl: product.imageUrl, price: product.price, stockQuantity: product.stockQuantity });
     setDialogOpen(true);
   };
 
@@ -54,12 +99,7 @@ export function AdminProductsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = {
-      ...form,
-      price: Number(form.price),
-      stockQuantity: Number(form.stockQuantity),
-    };
-
+    const payload = { ...form, price: Number(form.price), stockQuantity: Number(form.stockQuantity) };
     try {
       if (editingProduct) {
         await updateProduct.mutateAsync({ id: editingProduct.id, ...payload });
@@ -89,55 +129,55 @@ export function AdminProductsPage() {
 
   if (isLoading) {
     return (
-      <div className="animate-pulse space-y-4">
-        <div className="h-8 w-48 rounded bg-gray-200" />
-        <div className="h-64 rounded bg-gray-200" />
-      </div>
+      <SkeletonWrapper>
+        <SkeletonBox $h="2rem" $w="12rem" />
+        <SkeletonBox $h="16rem" />
+      </SkeletonWrapper>
     );
   }
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{t('adminProducts.title')}</h1>
+      <PageHeader>
+        <PageTitle>{t('adminProducts.title')}</PageTitle>
         <Button onClick={openAddDialog}>{t('adminProducts.addProduct')}</Button>
-      </div>
+      </PageHeader>
 
       <Card>
-        <CardContent className="p-0">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-gray-50 text-left">
-                <th className="px-4 py-3">{t('adminProducts.colName')}</th>
-                <th className="px-4 py-3">{t('adminProducts.colPrice')}</th>
-                <th className="px-4 py-3">{t('adminProducts.colStock')}</th>
-                <th className="px-4 py-3 text-right">{t('adminProducts.colActions')}</th>
+        <CardContent style={{ padding: 0 }}>
+          <DataTable>
+            <TableHead>
+              <tr>
+                <Th>{t('adminProducts.colName')}</Th>
+                <Th>{t('adminProducts.colPrice')}</Th>
+                <Th>{t('adminProducts.colStock')}</Th>
+                <ThRight>{t('adminProducts.colActions')}</ThRight>
               </tr>
-            </thead>
+            </TableHead>
             <tbody>
               {products.map((product) => (
-                <tr key={product.id} className="border-b last:border-0">
-                  <td className="px-4 py-3 font-medium">{product.name}</td>
-                  <td className="px-4 py-3">${product.price.toFixed(2)}</td>
-                  <td className="px-4 py-3">
-                    <span className={product.stockQuantity === 0 ? 'text-red-500 font-medium' : ''}>
-                      {product.stockQuantity}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-2">
+                <tr key={product.id}>
+                  <Td style={{ fontWeight: 500 }}>{product.name}</Td>
+                  <Td>${product.price.toFixed(2)}</Td>
+                  <Td>
+                    {product.stockQuantity === 0
+                      ? <LowStock>{product.stockQuantity}</LowStock>
+                      : product.stockQuantity}
+                  </Td>
+                  <ActionCell>
+                    <ButtonGroup>
                       <Button variant="outline" size="sm" onClick={() => openEditDialog(product)}>
                         {t('adminProducts.edit')}
                       </Button>
                       <Button variant="destructive" size="sm" onClick={() => openDeleteDialog(product)}>
                         {t('adminProducts.delete')}
                       </Button>
-                    </div>
-                  </td>
+                    </ButtonGroup>
+                  </ActionCell>
                 </tr>
               ))}
             </tbody>
-          </table>
+          </DataTable>
         </CardContent>
       </Card>
 
@@ -147,46 +187,31 @@ export function AdminProductsPage() {
           <DialogHeader>
             <DialogTitle>{editingProduct ? t('adminProducts.editTitle') : t('adminProducts.addTitle')}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <FieldGroup>
               <Label>{t('adminProducts.nameLabel')}</Label>
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-            </div>
-            <div className="space-y-2">
+            </FieldGroup>
+            <FieldGroup>
               <Label>{t('adminProducts.descriptionLabel')}</Label>
               <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required />
-            </div>
-            <div className="space-y-2">
+            </FieldGroup>
+            <FieldGroup>
               <Label>{t('adminProducts.imageUrlLabel')}</Label>
               <Input value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} required />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+            </FieldGroup>
+            <FormGrid>
+              <FieldGroup>
                 <Label>{t('adminProducts.priceLabel')}</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={form.price}
-                  onChange={(e) => setForm({ ...form, price: parseFloat(e.target.value) || 0 })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
+                <Input type="number" step="0.01" min="0" value={form.price} onChange={(e) => setForm({ ...form, price: parseFloat(e.target.value) || 0 })} required />
+              </FieldGroup>
+              <FieldGroup>
                 <Label>{t('adminProducts.stockLabel')}</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={form.stockQuantity}
-                  onChange={(e) => setForm({ ...form, stockQuantity: parseInt(e.target.value) || 0 })}
-                  required
-                />
-              </div>
-            </div>
+                <Input type="number" min="0" value={form.stockQuantity} onChange={(e) => setForm({ ...form, stockQuantity: parseInt(e.target.value) || 0 })} required />
+              </FieldGroup>
+            </FormGrid>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                {t('adminProducts.cancel')}
-              </Button>
+              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>{t('adminProducts.cancel')}</Button>
               <Button type="submit" disabled={submitting}>
                 {submitting ? t('adminProducts.saving') : editingProduct ? t('adminProducts.update') : t('adminProducts.create')}
               </Button>
@@ -203,12 +228,8 @@ export function AdminProductsPage() {
           </DialogHeader>
           <p>{t('adminProducts.deleteConfirm', { name: deletingProduct?.name })}</p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
-              {t('adminProducts.cancel')}
-            </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={deleteProduct.isPending}>
-              {t('adminProducts.delete')}
-            </Button>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>{t('adminProducts.cancel')}</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleteProduct.isPending}>{t('adminProducts.delete')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

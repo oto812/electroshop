@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import styled from "styled-components";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useCart } from "@/context/CartContext";
@@ -6,7 +7,116 @@ import api from "@/lib/axios";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { NarrowContainer, EmptyState } from "@/styles/shared";
 import { toast } from "sonner";
+
+// ─── Styled components ────────────────────────────────────────────────────────
+
+const PageTitle = styled.h1`
+  font-size: ${({ theme }) => theme.font["2xl"]};
+  font-weight: ${({ theme }) => theme.weight.bold};
+  margin: 0 0 ${({ theme }) => theme.space[6]};
+`;
+
+const SummaryCard = styled(Card)`
+  margin-bottom: ${({ theme }) => theme.space[6]};
+`;
+
+const SummaryItem = styled.div`
+  display: flex;
+  justify-content: space-between;
+  font-size: ${({ theme }) => theme.font.sm};
+`;
+
+const SummaryDivider = styled.div`
+  border-top: 1px solid var(--border);
+  padding-top: ${({ theme }) => theme.space[3]};
+  margin-top: ${({ theme }) => theme.space[3]};
+`;
+
+const SummaryTotal = styled.div`
+  display: flex;
+  justify-content: space-between;
+  font-size: ${({ theme }) => theme.font.lg};
+  font-weight: ${({ theme }) => theme.weight.bold};
+`;
+
+const AddressWrapper = styled.div`
+  position: relative;
+`;
+
+const StyledAddressInput = styled.input`
+  display: flex;
+  width: 100%;
+  border-radius: ${({ theme }) => theme.radius.md};
+  border: 1px solid var(--input);
+  background-color: var(--background);
+  padding: 0.5rem 0.75rem;
+  font-size: ${({ theme }) => theme.font.sm};
+  color: var(--foreground);
+  outline: none;
+
+  &::placeholder {
+    color: var(--muted-foreground);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--ring);
+  }
+`;
+
+const SuggestionsDropdown = styled.div`
+  position: absolute;
+  z-index: 50;
+  margin-top: ${({ theme }) => theme.space[1]};
+  max-height: 16rem;
+  width: 100%;
+  overflow-y: auto;
+  border-radius: ${({ theme }) => theme.radius.md};
+  border: 1px solid var(--border);
+  background-color: ${({ theme }) => theme.color.white};
+  box-shadow: ${({ theme }) => theme.shadow.lg};
+`;
+
+const SuggestionItem = styled.button`
+  display: block;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: ${({ theme }) => `${theme.space[2]} ${theme.space[3]}`};
+  text-align: left;
+  font-size: ${({ theme }) => theme.font.sm};
+  background: none;
+  cursor: pointer;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover {
+    background-color: #f9fafb;
+  }
+`;
+
+const SpinnerIcon = styled.svg`
+  height: 1rem;
+  width: 1rem;
+  animation: spin 1s linear infinite;
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+`;
+
+const LoadingRow = styled.span`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space[2]};
+`;
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface NominatimSuggestion {
   place_id: number;
@@ -14,6 +124,8 @@ interface NominatimSuggestion {
   lat: string;
   lon: string;
 }
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function CheckoutPage() {
   const { cartItems, clearCart } = useCart();
@@ -28,19 +140,13 @@ export function CheckoutPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
 
-  const total = cartItems.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0,
-  );
+  const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (!dropdownRef.current) return;
-      if (!dropdownRef.current.contains(event.target as Node)) {
-        setDropdownOpen(false);
-      }
+      if (!dropdownRef.current.contains(event.target as Node)) setDropdownOpen(false);
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
@@ -62,9 +168,7 @@ export function CheckoutPage() {
           `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodedQuery}&countrycodes=ge`,
           { headers: { "Accept-Language": "en" } },
         );
-
-        if (!response.ok) throw new Error("Failed to fetch address suggestions");
-
+        if (!response.ok) throw new Error("Failed to fetch");
         const data: NominatimSuggestion[] = await response.json();
         setSuggestions(data);
         setDropdownOpen(data.length > 0);
@@ -74,32 +178,23 @@ export function CheckoutPage() {
       }
     }, 300);
 
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [address]);
 
-  const handleSuggestionClick = (suggestion: NominatimSuggestion) => {
-    setAddress(suggestion.display_name);
+  const handleSuggestionClick = (s: NominatimSuggestion) => {
+    setAddress(s.display_name);
     setSuggestions([]);
     setDropdownOpen(false);
   };
 
-  const handleAddressKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Escape") setDropdownOpen(false);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (address.length < 10) {
       toast.error(t("checkout.addressError"));
       return;
     }
-
     setLoading(true);
     await new Promise((resolve) => setTimeout(resolve, 2000));
-
     try {
       const { data } = await api.post("/orders", { deliveryAddress: address });
       clearCart();
@@ -114,95 +209,81 @@ export function CheckoutPage() {
 
   if (cartItems.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-4 py-12">
-        <p className="text-lg text-gray-500">{t("checkout.cartEmpty")}</p>
+      <EmptyState>
+        {t("checkout.cartEmpty")}
         <Button onClick={() => navigate("/")}>{t("checkout.continueShopping")}</Button>
-      </div>
+      </EmptyState>
     );
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <h1 className="mb-6 text-2xl font-bold">{t("checkout.title")}</h1>
+    <NarrowContainer $maxWidth="42rem">
+      <PageTitle>{t("checkout.title")}</PageTitle>
 
-      <Card className="mb-6">
+      <SummaryCard>
         <CardHeader>
           <CardTitle>{t("checkout.orderSummary")}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
             {cartItems.map((item) => (
-              <div key={item.productId} className="flex justify-between text-sm">
+              <SummaryItem key={item.productId}>
                 <span>{item.name} x {item.quantity}</span>
                 <span>${(item.price * item.quantity).toFixed(2)}</span>
-              </div>
+              </SummaryItem>
             ))}
-            <div className="border-t pt-3">
-              <div className="flex justify-between text-lg font-bold">
+            <SummaryDivider>
+              <SummaryTotal>
                 <span>{t("checkout.total")}</span>
                 <span>${total.toFixed(2)}</span>
-              </div>
-            </div>
+              </SummaryTotal>
+            </SummaryDivider>
           </div>
         </CardContent>
-      </Card>
+      </SummaryCard>
 
       <Card>
         <CardHeader>
           <CardTitle>{t("checkout.deliveryDetails")}</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div ref={dropdownRef} className="space-y-2">
+          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <div ref={dropdownRef} style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
               <Label htmlFor="address">{t("checkout.addressLabel")}</Label>
-              <div className="relative">
-                <input
+              <AddressWrapper>
+                <StyledAddressInput
                   id="address"
                   type="text"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  onKeyDown={handleAddressKeyDown}
+                  onKeyDown={(e) => { if (e.key === "Escape") setDropdownOpen(false); }}
                   onFocus={() => { if (suggestions.length > 0) setDropdownOpen(true); }}
                   placeholder={t("checkout.addressPlaceholder")}
                   required
                   minLength={10}
                   autoComplete="off"
-                  className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 />
                 {dropdownOpen && suggestions.length > 0 && (
-                  <div className="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-md border bg-white shadow-lg">
-                    {suggestions.map((suggestion) => (
-                      <button
-                        key={suggestion.place_id}
-                        type="button"
-                        onClick={() => handleSuggestionClick(suggestion)}
-                        className="block w-full border-b px-3 py-2 text-left text-sm hover:bg-gray-50 last:border-b-0"
-                      >
-                        {suggestion.display_name}
-                      </button>
+                  <SuggestionsDropdown>
+                    {suggestions.map((s) => (
+                      <SuggestionItem key={s.place_id} type="button" onClick={() => handleSuggestionClick(s)}>
+                        {s.display_name}
+                      </SuggestionItem>
                     ))}
-                  </div>
+                  </SuggestionsDropdown>
                 )}
-              </div>
+              </AddressWrapper>
             </div>
 
             <Button type="submit" className="w-full" size="lg" disabled={loading}>
               {loading ? (
-                <span className="flex items-center gap-2">
-                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
-                    <circle
-                      className="opacity-25"
-                      cx="12" cy="12" r="10"
-                      stroke="currentColor" strokeWidth="4" fill="none"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                    />
-                  </svg>
+                <LoadingRow>
+                  <SpinnerIcon viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </SpinnerIcon>
                   {t("checkout.processing")}
-                </span>
+                </LoadingRow>
               ) : (
                 t("checkout.payNow", { amount: total.toFixed(2) })
               )}
@@ -210,6 +291,6 @@ export function CheckoutPage() {
           </form>
         </CardContent>
       </Card>
-    </div>
+    </NarrowContainer>
   );
 }

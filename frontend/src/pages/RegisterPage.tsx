@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import styled from 'styled-components';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
@@ -7,7 +8,41 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { AuthWrapper } from '@/styles/shared';
 import { toast } from 'sonner';
+
+const FormCard = styled(Card)`
+  width: 100%;
+  max-width: 28rem;
+`;
+
+const FormBody = styled.form`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space[4]};
+`;
+
+const FieldGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space[2]};
+`;
+
+const FooterText = styled.p`
+  text-align: center;
+  font-size: ${({ theme }) => theme.font.sm};
+  color: ${({ theme }) => theme.color.gray600};
+  margin: 0;
+`;
+
+const FooterLink = styled(Link)`
+  color: ${({ theme }) => theme.color.blue600};
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+`;
 
 export function RegisterPage() {
   const [email, setEmail] = useState('');
@@ -25,7 +60,6 @@ export function RegisterPage() {
       const { data } = await api.post('/auth/register', { email, password });
       login(data.token, data.user);
 
-      // Merge guest cart
       const guestCart = localStorage.getItem('guestCart');
       if (guestCart) {
         try {
@@ -51,15 +85,15 @@ export function RegisterPage() {
   };
 
   return (
-    <div className="flex min-h-[80vh] items-center justify-center">
-      <Card className="w-full max-w-md">
+    <AuthWrapper>
+      <FormCard>
         <CardHeader>
           <CardTitle>{t('auth.register.title')}</CardTitle>
           <CardDescription>{t('auth.register.description')}</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
+          <FormBody onSubmit={handleSubmit}>
+            <FieldGroup>
               <Label htmlFor="email">{t('auth.register.emailLabel')}</Label>
               <Input
                 id="email"
@@ -69,8 +103,8 @@ export function RegisterPage() {
                 placeholder={t('auth.register.emailPlaceholder')}
                 required
               />
-            </div>
-            <div className="space-y-2">
+            </FieldGroup>
+            <FieldGroup>
               <Label htmlFor="password">{t('auth.register.passwordLabel')}</Label>
               <Input
                 id="password"
@@ -81,19 +115,17 @@ export function RegisterPage() {
                 minLength={6}
                 required
               />
-            </div>
+            </FieldGroup>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? t('auth.register.creating') : t('auth.register.submit')}
             </Button>
-            <p className="text-center text-sm text-gray-600">
+            <FooterText>
               {t('auth.register.hasAccount')}{' '}
-              <Link to="/login" className="text-blue-600 hover:underline">
-                {t('auth.register.loginLink')}
-              </Link>
-            </p>
-          </form>
+              <FooterLink to="/login">{t('auth.register.loginLink')}</FooterLink>
+            </FooterText>
+          </FormBody>
         </CardContent>
-      </Card>
-    </div>
+      </FormCard>
+    </AuthWrapper>
   );
 }

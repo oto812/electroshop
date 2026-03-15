@@ -1,26 +1,78 @@
+import styled from 'styled-components';
 import { useTranslation } from 'react-i18next';
 import { useProducts } from '@/lib/queries';
 import { useCart } from '@/context/CartContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageTitle, EmptyState, SkeletonCard, SkeletonBox } from '@/styles/shared';
 import { toast } from 'sonner';
+
+// ─── Styled components ────────────────────────────────────────────────────────
+
+const ProductGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: ${({ theme }) => theme.space[6]};
+
+  @media (min-width: ${({ theme }) => theme.breakpoint.sm}) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (min-width: ${({ theme }) => theme.breakpoint.lg}) {
+    grid-template-columns: repeat(3, 1fr);
+  }
+`;
+
+const ProductCard = styled(Card)`
+  display: flex;
+  flex-direction: column;
+`;
+
+const ProductImage = styled.img`
+  height: 12rem;
+  width: 100%;
+  object-fit: cover;
+  border-radius: ${({ theme }) => `${theme.radius.xl} ${theme.radius.xl} 0 0`};
+`;
+
+const ProductDescription = styled.p`
+  font-size: ${({ theme }) => theme.font.sm};
+  color: ${({ theme }) => theme.color.gray600};
+  margin: 0 0 ${({ theme }) => theme.space[2]};
+`;
+
+const ProductPrice = styled.p`
+  font-size: ${({ theme }) => theme.font.xl};
+  font-weight: ${({ theme }) => theme.weight.bold};
+  margin: 0;
+`;
+
+const SkeletonImageBox = styled.div`
+  height: 12rem;
+  border-radius: ${({ theme }) => `${theme.radius.xl} ${theme.radius.xl} 0 0`};
+  background-color: #e5e7eb;
+`;
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function ProductSkeleton() {
   return (
-    <Card className="animate-pulse">
-      <div className="h-48 rounded-t-lg bg-gray-200" />
+    <SkeletonCard>
+      <SkeletonImageBox />
       <CardHeader>
-        <div className="h-5 w-3/4 rounded bg-gray-200" />
+        <SkeletonBox $h="1.25rem" $w="75%" />
       </CardHeader>
       <CardContent>
-        <div className="h-4 w-1/4 rounded bg-gray-200" />
+        <SkeletonBox $h="1rem" $w="25%" />
       </CardContent>
       <CardFooter>
-        <div className="h-9 w-full rounded bg-gray-200" />
+        <SkeletonBox $h="2.25rem" />
       </CardFooter>
-    </Card>
+    </SkeletonCard>
   );
 }
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function ProductListPage() {
   const { data: products = [], isLoading } = useProducts();
@@ -41,48 +93,38 @@ export function ProductListPage() {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <ProductSkeleton key={i} />
-        ))}
-      </div>
+      <ProductGrid>
+        {Array.from({ length: 6 }).map((_, i) => <ProductSkeleton key={i} />)}
+      </ProductGrid>
     );
   }
 
   if (products.length === 0) {
-    return (
-      <div className="py-12 text-center text-gray-500">
-        {t('products.empty')}
-      </div>
-    );
+    return <EmptyState>{t('products.empty')}</EmptyState>;
   }
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold">{t('products.title')}</h1>
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <PageTitle style={{ marginBottom: '1.5rem' }}>{t('products.title')}</PageTitle>
+      <ProductGrid>
         {products.map((product) => (
-          <Card key={product.id} className="flex flex-col">
-            <img
-              src={product.imageUrl}
-              alt={product.name}
-              className="h-48 w-full rounded-t-lg object-cover"
-            />
+          <ProductCard key={product.id}>
+            <ProductImage src={product.imageUrl} alt={product.name} />
             <CardHeader>
               <CardTitle className="text-lg">{product.name}</CardTitle>
             </CardHeader>
-            <CardContent className="flex-1">
-              <p className="mb-2 text-sm text-gray-600">{product.description}</p>
-              <p className="text-xl font-bold">${product.price.toFixed(2)}</p>
+            <CardContent style={{ flex: 1 }}>
+              <ProductDescription>{product.description}</ProductDescription>
+              <ProductPrice>${product.price.toFixed(2)}</ProductPrice>
             </CardContent>
             <CardFooter>
               <Button className="w-full" onClick={() => handleAddToCart(product)}>
                 {t('products.addToCart')}
               </Button>
             </CardFooter>
-          </Card>
+          </ProductCard>
         ))}
-      </div>
+      </ProductGrid>
     </div>
   );
 }
