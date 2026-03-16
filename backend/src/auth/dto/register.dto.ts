@@ -5,8 +5,8 @@ export class RegisterDto {
     email: string;
 
     @IsString()
-    @MinLength(6)
-    password:string;
+    @MinLength(1)
+    encryptedCredential: string;
 
 
 }

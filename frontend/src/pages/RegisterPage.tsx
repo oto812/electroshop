@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AuthWrapper } from '@/styles/shared';
 import { toast } from 'sonner';
+import { encryptCredentialForAuth } from '@/lib/auth-crypto';
 
 const FormCard = styled(Card)`
   width: 100%;
@@ -55,9 +56,15 @@ export function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
+  
     try {
-      const { data } = await api.post('/auth/register', { email, password });
+      const currentPassword = password;
+
+      setPassword('');
+      const encryptedPassword = await encryptCredentialForAuth(currentPassword);
+
+      
+      const { data } = await api.post('/auth/register', { email, encryptedCredential: encryptedPassword, });
       login(data.token, data.user);
 
       const guestCart = localStorage.getItem('guestCart');
